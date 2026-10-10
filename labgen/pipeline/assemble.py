@@ -45,13 +45,13 @@ def render_latex(template_path, output_tex_path, context):
         f.write(rendered)
 
 def compile_pdf(tex_file, output_dir):
-    """Compiles the tex file to PDF using tectonic."""
-    cmd = ["tectonic", "--outdir", output_dir, tex_file]
+    """Compiles the tex file to PDF using pdflatex."""
+    cmd = ["pdflatex", "-output-directory", output_dir, "-interaction=nonstopmode", tex_file]
     
-    print("Compiling LaTeX to PDF using tectonic...")
+    print("Compiling LaTeX to PDF using pdflatex...")
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
-        print("tectonic failed. Output:")
+        print("pdflatex failed. Output:")
         print(result.stdout)
         print(result.stderr)
         
