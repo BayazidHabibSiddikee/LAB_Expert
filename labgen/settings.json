@@ -2,7 +2,7 @@
   "llm": {
     "provider": "openai",
     "base_url": "https://router.bynara.id/v1",
-    "api_key": "${LABGEN_API_KEY}",
+    "api_key": "YOUR_API_KEY_HERE",
     "model": "nemotron-3.5-lightning-free",
     "temperature": 0.2
   },

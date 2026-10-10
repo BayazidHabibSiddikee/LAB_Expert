@@ -5,3 +5,4 @@ labgen/frontend/dist/
 labgen/backend/__pycache__/
 labgen/pipeline/__pycache__/
 labgen/__pycache__/
+labgen/settings.json
