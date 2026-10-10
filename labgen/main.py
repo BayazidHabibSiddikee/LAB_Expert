@@ -150,18 +150,22 @@ def execute_dynamic_circuit(run_dir, exp_name, circuit_prompt):
     return cir_path, txt_out, schem_path, circuit_json
 
 def _build_data_table_from_simulation(txt_out: str) -> str:
+    import os
+    if not os.path.exists(txt_out) and os.path.exists(txt_out.replace('.txt', '_tran.txt')):
+        txt_out = txt_out.replace('.txt', '_tran.txt')
     try:
         df = pd.read_csv(txt_out, sep=r'\s+', header=None)
         if df.shape[1] >= 4:
-            v = pd.concat([df[0], df[2]]).reset_index(drop=True)
-            i = pd.concat([df[1], df[3]]).reset_index(drop=True)
-        else:
+            v = df[1]
+            i = df[3]
+        elif df.shape[1] >= 2:
             v = df[0]
             i = df[1]
+        else:
+            return ""
 
-        v_sorted, i_sorted = zip(*sorted(zip(v, i)))
-        v_sorted = list(v_sorted)
-        i_sorted = list(i_sorted)
+        v_sorted = list(v)
+        i_sorted = list(i)
 
         n_points = min(10, len(v_sorted))
         indices = [int(j * (len(v_sorted) - 1) / (n_points - 1)) for j in range(n_points)]
@@ -250,6 +254,7 @@ def run_generation(args, settings):
     plt.axvline(0, color='black', linewidth=1)
     
     success_sim = False
+    tran_data = []
     
     for r_idx, r_val in enumerate(r_vals):
         loop_txt_out = txt_out.replace('.txt', f'_{r_idx}.txt')
@@ -272,8 +277,24 @@ def run_generation(args, settings):
             else:
                 loop_netlist += f"{comp}\n"
                 
+        is_transient = any(kw in args.name.lower() for kw in ["buck", "boost", "converter", "rectifier", "inverter", "oscillator", "filter", "chopper", "switching"])
+        
         loop_netlist += f"""
 * Analysis
+"""
+        if is_transient:
+            loop_netlist += f"""
+.tran 10u 10m
+
+.control
+    run
+    setplot tran1
+    wrdata {loop_txt_out.replace('.txt', '_tran.txt')} time V(2) -I(V1)
+.endc
+.end
+"""
+        else:
+            loop_netlist += f"""
 .dc V1 -15 15 0.1
 
 .control
@@ -288,29 +309,82 @@ def run_generation(args, settings):
             f.write(loop_netlist)
             
         res = subprocess.run(["ngspice", "-b", cir_path], capture_output=True)
-        if res.returncode == 0 and os.path.exists(loop_txt_out):
+        if res.returncode == 0 and (os.path.exists(loop_txt_out) or os.path.exists(loop_txt_out.replace('.txt', '_tran.txt'))):
             success_sim = True
-            try:
-                df = pd.read_csv(loop_txt_out, sep=r'\s+', header=None)
-                plt.plot(df[2], df[3] * 1000, linewidth=2, color=colors[r_idx % len(colors)], label=f"R={r_val}")
-            except Exception as e:
-                pass
+            if os.path.exists(loop_txt_out):
+                try:
+                    df = pd.read_csv(loop_txt_out, sep=r'\s+', header=None)
+                    if df.shape[1] >= 4:
+                        plt.plot(df[1], df[3] * 1000, linewidth=2, color=colors[r_idx % len(colors)], label=f"R={r_val}")
+                    elif df.shape[1] >= 2:
+                        plt.plot(df[0], df[1] * 1000, linewidth=2, color=colors[r_idx % len(colors)], label=f"R={r_val}")
+                except Exception as e:
+                    pass
+            
+            if os.path.exists(loop_txt_out.replace('.txt', '_tran.txt')):
+                try:
+                    df_tran = pd.read_csv(loop_txt_out.replace('.txt', '_tran.txt'), sep=r'\s+', header=None)
+                    tran_data.append((r_val, colors[r_idx % len(colors)], df_tran))
+                except Exception as e:
+                    pass
 
     if not success_sim:
-        logger.warning("Dynamic circuit failed, falling back to static triac circuit...")
-        cir_file, fb_txt_out = create_triac_netlist(run_dir)
-        subprocess.run(["ngspice", "-b", cir_file], capture_output=True)
-        try:
-            df = pd.read_csv(fb_txt_out, sep=r'\s+', header=None)
-            plt.plot(df[2], df[3] * 1000, linewidth=2, color='b', label="Fallback")
-            import shutil
-            shutil.copy(fb_txt_out, txt_out)
-        except Exception:
-            pass
+        logger.warning("Dynamic circuit failed, falling back to template circuit...")
+        from pipeline.circuit_templates import get_fallback_circuit
+        fallback_json = get_fallback_circuit(args.name, circuit_prompt)
+        circuit_json.update(fallback_json)
+        
+        fb_netlist = f"Fallback Circuit: {args.name}\n"
+        fb_netlist += "\n".join(circuit_json["netlist_components"])
+        
+        is_transient = any(kw in args.name.lower() for kw in ["buck", "boost", "converter", "rectifier", "inverter", "oscillator", "filter", "chopper", "switching"])
+        
+        fb_netlist += "\n* Analysis\n"
+        if is_transient:
+            fb_netlist += f"""
+.tran 10u 10m
+.control
+    run
+    setplot tran1
+    wrdata {txt_out.replace('.txt', '_tran.txt')} time V(2) -I(V1)
+.endc
+.end
+"""
+        else:
+            fb_netlist += f"""
+.dc V1 -15 15 0.1
+.control
+    run
+    let V_target = V(2)
+    let I_target = -I(V1)
+    wrdata {txt_out} V_target I_target
+.endc
+.end
+"""
+        with open(cir_path, 'w') as f:
+            f.write(fb_netlist)
+            
+        subprocess.run(["ngspice", "-b", cir_path], capture_output=True)
+        if is_transient:
+            try:
+                df_tran = pd.read_csv(txt_out.replace('.txt', '_tran.txt'), sep=r'\s+', header=None)
+                tran_data.append(("Fallback", 'b', df_tran))
+            except Exception:
+                pass
+        else:
+            try:
+                df = pd.read_csv(txt_out, sep=r'\s+', header=None)
+                if df.shape[1] >= 4:
+                    plt.plot(df[1], df[3] * 1000, linewidth=2, color='b', label="Fallback")
+                elif df.shape[1] >= 2:
+                    plt.plot(df[0], df[1] * 1000, linewidth=2, color='b', label="Fallback")
+            except Exception:
+                pass
     else:
         import shutil
         try:
-            shutil.copy(txt_out.replace('.txt', '_0.txt'), txt_out)
+            if os.path.exists(txt_out.replace('.txt', '_0.txt')):
+                shutil.copy(txt_out.replace('.txt', '_0.txt'), txt_out)
         except:
             pass
             
@@ -318,37 +392,54 @@ def run_generation(args, settings):
     plt.legend()
     plt.tight_layout()
     plt.savefig(plot_path, dpi=300)
+    
+    tran_plot_path = None
+    if tran_data:
+        plt.figure(figsize=(8, 6))
+        plt.title(f"{args.name} Transient Response (Voltage)", fontsize=14)
+        plt.xlabel("Time (ms)", fontsize=12)
+        plt.ylabel("Voltage (V)", fontsize=12)
+        plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+        for r_val, color, df_tran in tran_data:
+            plt.plot(df_tran[0] * 1000, df_tran[1], linewidth=2, color=color, label=f"R={r_val}")
+        plt.legend()
+        plt.tight_layout()
+        tran_plot_path = os.path.join(run_dir, "figs", f"{slug}_tran_plot.png")
+        plt.savefig(tran_plot_path, dpi=300)
     plt.close()
         
-    try:
-        schemdraw_code = circuit_json.get("schemdraw_code", "")
-        if schemdraw_code:
-            import schemdraw
-            import schemdraw.elements as elm
-            safe_builtins = {
-                'print': print, 'range': range, 'int': int, 'float': float,
-                'str': str, 'list': list, 'dict': dict, 'Exception': Exception,
-                'zip': zip, 'enumerate': enumerate, 'len': len
-            }
-            safe_globals = {
-                "__builtins__": safe_builtins,
-                "schemdraw": schemdraw,
-                "elm": elm
-            }
-            local_vars = {}
-            if validate_schemdraw_ast(schemdraw_code):
-                exec(schemdraw_code, safe_globals, local_vars)
+    def _execute_schemdraw(code, path, skip_ast=False):
+        import schemdraw
+        import schemdraw.elements as elm
+        safe_builtins = {
+            'print': print, 'range': range, 'int': int, 'float': float,
+            'str': str, 'list': list, 'dict': dict, 'Exception': Exception,
+            'zip': zip, 'enumerate': enumerate, 'len': len
+        }
+        safe_globals = {
+            "__builtins__": safe_builtins,
+            "schemdraw": schemdraw,
+            "elm": elm
+        }
+        local_vars = {}
+        if skip_ast or validate_schemdraw_ast(code):
+            try:
+                exec(code, safe_globals, local_vars)
                 if 'draw_circuit' in local_vars:
-                    local_vars['draw_circuit'](schem_path)
-                else:
-                    draw_triac_circuit(schem_path)
-            else:
-                draw_triac_circuit(schem_path)
-        else:
-            draw_triac_circuit(schem_path)
-    except Exception as e:
-        logger.error(f"Error executing schemdraw_code: {e}")
-        draw_triac_circuit(schem_path)
+                    local_vars['draw_circuit'](path)
+                    return True
+            except Exception as e:
+                logger.error(f"Execution error: {e}")
+        return False
+
+    schemdraw_code = circuit_json.get("schemdraw_code", "")
+    if not (schemdraw_code and _execute_schemdraw(schemdraw_code, schem_path, skip_ast=False)):
+        logger.warning("Dynamic schemdraw failed, falling back to template...")
+        from pipeline.circuit_templates import get_fallback_circuit
+        fallback_json = get_fallback_circuit(args.name, circuit_prompt)
+        fb_code = fallback_json.get("schemdraw_code", "")
+        if fb_code:
+            _execute_schemdraw(fb_code, schem_path, skip_ast=True)
 
     logger.info("Scraping theory reference images (if enabled)...")
     theory_img_path = ""
@@ -377,13 +468,11 @@ def run_generation(args, settings):
         "theory": esc(llm_sections.get("theory", "")),
         "discussion": esc(llm_sections.get("discussion", "")),
         "conclusion": esc(llm_sections.get("conclusion", "")),
-        "procedure": [
-            "Connect the circuit as per the experimental circuit diagram.",
-            "Apply a constant gate current $I_G$.",
-            "Vary the supply voltage from -15V to 15V.",
-            "Record the voltage and current.",
-            "Plot the characteristics."
-        ],
+        "procedure": esc(llm_sections.get("procedure", [
+            "Connect the setup as per the diagram.",
+            "Set up the simulation and initialize parameters.",
+            "Record the output and plot the results."
+        ])),
         "data_table_latex": data_table_latex,
         "references": ["Generated by LabGen Knowledge Hub API", "Ngspice Simulation Data."]
     }
@@ -391,16 +480,7 @@ def run_generation(args, settings):
     if circuit_json:
         sections["circuit_design"] = circuit_json.get("circuit_design_text", "")
 
-    if not args.cad_prompt:
-        sections["circuit_design"] = "A variable DC voltage source is connected across the main terminals. A gate current is provided to trigger the device. The voltage is swept from negative to positive values."
-        sections["apparatus"] = [
-            {"name": "DC Power Supply (Variable)", "quantity": "1"},
-            {"name": "Device Under Test", "quantity": "1"},
-            {"name": "Resistor ($1 k\\Omega$)", "quantity": "1"},
-            {"name": "Multimeter", "quantity": "2"}
-        ]
-    else:
-        sections["apparatus"] = circuit_json.get("apparatus", []) if circuit_json else []
+    sections["apparatus"] = circuit_json.get("apparatus", []) if circuit_json else []
 
     context = {
         "config": config,
@@ -412,17 +492,29 @@ def run_generation(args, settings):
         "circuit_img": os.path.abspath(schem_path).replace('\\\\', '/') if schem_path else "",
         "theory_img": os.path.abspath(theory_img_path).replace('\\\\', '/') if theory_img_path else "",
         "plots": [
-            {"path": os.path.abspath(plot_path).replace('\\\\', '/') if plot_path else "", "caption": f"Simulated {args.name} Curve"}
+            {"path": os.path.abspath(plot_path).replace('\\\\', '/') if plot_path else "", "caption": f"Simulated {args.name} DC Characteristics"}
         ]
     }
+    
+    if tran_plot_path and os.path.exists(tran_plot_path):
+        context["plots"].append({"path": os.path.abspath(tran_plot_path).replace('\\\\', '/'), "caption": f"Simulated {args.name} Transient Response"})
 
     if args.cad_prompt:
+        from pipeline.cad import design_cad_agent
         cad_step_path = os.path.join(run_dir, "cad_model.step")
         success = design_cad_agent(args.cad_prompt, cad_step_path)
         if success:
             cad_svg = os.path.abspath(cad_step_path.replace(".step", ".svg")).replace("\\", "/")
             if os.path.exists(cad_svg):
                 context["cad_img"] = cad_svg
+
+    if hasattr(args, 'fluidsim_prompt') and args.fluidsim_prompt:
+        from pipeline.fluidsim import generate_fluidsim_circuit
+        fs_path = os.path.join(run_dir, "pneumatic_circuit.ct")
+        success = generate_fluidsim_circuit(args.fluidsim_prompt, fs_path)
+        if success:
+            # LaTeX \includegraphics cannot render JSON. Store it in a separate context key.
+            context["fluidsim_data"] = os.path.abspath(fs_path.replace(".ct", ".json")).replace("\\", "/")
 
     pdf_filename = f"Exp_{args.exp:02d}_{slug}.tex"
     tex_out = os.path.join(run_dir, pdf_filename)
@@ -530,8 +622,8 @@ def run_verification(args, settings):
         write_report(results, out_path)
 
 def run_index(args, settings):
-    from pipeline.rag import build_rag_index
-    from pipeline.cad import design_cad_agent, get_rag_context
+    from pipeline.rag import build_rag_index, get_rag_context
+    from pipeline.cad import design_cad_agent
     if args.rebuild:
         logger.info("Rebuilding RAG index...")
         build_rag_index(force_rebuild=True)
@@ -551,6 +643,7 @@ def main():
     gen_parser.add_argument("name", help="Name of the experiment")
     gen_parser.add_argument("circuit_prompt", nargs="?", default="", help="Prompt describing circuit connections")
     gen_parser.add_argument("--cad-prompt", help="Prompt for generating 3D CAD mechanical models via CadQuery")
+    gen_parser.add_argument("--fluidsim-prompt", help="Prompt for generating FluidSim pneumatic/hydraulic circuits")
     gen_parser.add_argument("--exp", type=int, default=2, help="Experiment number")
 
     verify_parser = subparsers.add_parser("verify", help="Verify lab report")
