@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -113,7 +114,6 @@ def _extract_latex_table(text: str) -> str:
             break
     return "\n".join(table_lines)
 
-import re
 from pipeline.ocr import extract_text_with_ocr
 
 def extract_pdf(pdf_path: str) -> Dict[str, Any]:
