@@ -49,7 +49,7 @@ def call_llm(system_prompt: str, user_prompt: str, response_json: bool = True) -
         if response_json:
             payload["response_format"] = {"type": "json_object"}
         
-        resp = requests.post(f"{base_url}/chat/completions", headers=headers, json=payload, timeout=15)
+        resp = requests.post(f"{base_url}/chat/completions", headers=headers, json=payload, timeout=60)
         resp.raise_for_status()
         data = resp.json()
         if "choices" in data and len(data["choices"]) > 0:
@@ -85,7 +85,7 @@ def call_llm(system_prompt: str, user_prompt: str, response_json: bool = True) -
         }
         if response_json:
             payload["response_format"] = {"type": "json_object"}
-        resp = requests.post(f"{base_url}/chat/completions", headers=headers, json=payload, timeout=15)
+        resp = requests.post(f"{base_url}/chat/completions", headers=headers, json=payload, timeout=60)
         resp.raise_for_status()
         data = resp.json()
         if "choices" in data and len(data["choices"]) > 0:
@@ -109,7 +109,7 @@ def call_llm(system_prompt: str, user_prompt: str, response_json: bool = True) -
         return json.loads(text.strip())
     return text
 
-def generate_report_sections(experiment_name: str, research_context: str) -> Dict[str, Any]:
+def generate_report_sections(experiment_name: str, research_context: str, circuit_json: Dict[str, Any] = None) -> Dict[str, Any]:
     prompt_path = os.path.join(os.path.dirname(__file__), "..", "prompts", "system_prompt.txt")
     with open(prompt_path, "r") as f:
         system_prompt = f.read()
@@ -124,12 +124,15 @@ Generate the following sections for the lab report as a JSON object:
 {{
     "objectives": ["To ...", "To ..."],
     "theory": "Introduction paragraph 1... \\n\\nIntroduction paragraph 2...",
+    "procedure": ["Step 1...", "Step 2...", "Step 3..."],
     "discussion": "Past tense discussion...",
     "conclusion": "Past tense conclusion..."
 }}
 Ensure you meet the word counts specified in your system instructions.
 """
-    
+    if circuit_json:
+        user_prompt += f"\n\nCircuit Design Details:\n{json.dumps(circuit_json, indent=2)}\nIncorporate these circuit details into the procedure, theory, and discussion where applicable."
+
     return call_llm(system_prompt, user_prompt, response_json=True)
 
 def generate_circuit_design(experiment_name: str, connection_prompt: str) -> Dict[str, Any]:

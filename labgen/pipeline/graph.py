@@ -31,29 +31,34 @@ def design_circuit(state: LabState):
 def draft_report(state: LabState):
     print("Graph: Drafting report sections...")
     try:
-        sections = generate_report_sections(state["experiment_name"], state["research_context"])
+        sections = generate_report_sections(state["experiment_name"], state["research_context"], state.get("circuit_json"))
     except Exception as e:
         print(f"Graph: LLM drafting error ({e}), generating structured technical sections...")
         sections = {
             "objectives": [
                 f"To study and analyze the operation of the {state['experiment_name']}.",
-                "To simulate the circuit response and examine voltages and currents under varying supply conditions.",
-                "To verify theoretical switching relationships and continuous/discontinuous conduction behaviors."
+                "To simulate the response and examine parameters under varying supply conditions.",
+                "To verify theoretical relationships and behaviors."
             ],
             "theory": (
-                f"The {state['experiment_name']} operates based on fundamental electromagnetic and semiconductor switching principles. "
-                "The conversion dynamics are governed by charge and volt-second balance equations across energy storage elements. "
-                "Under continuous conduction mode (CCM), the output voltage magnitude depends directly on the converter duty ratio D. "
-                "Experimental verification involves observing output voltage ripple, transient settling, and semiconductor conduction drops."
+                f"The {state['experiment_name']} operates based on fundamental principles of its respective domain. "
+                "The conversion dynamics and functional relationships are governed by core governing equations. "
+                "Experimental verification involves observing output ripple, transient settling, and characteristic performance."
             ),
+            "procedure": [
+                "Connect the circuit components as indicated in the schematic diagram.",
+                "Verify all connections and safety protocols before applying power.",
+                "Slowly sweep the primary parameter and record corresponding measurements.",
+                "Tabulate the data and plot the performance characteristics for analysis."
+            ],
             "discussion": (
-                "The simulated waveforms conformed closely to the theoretical power electronics equations. "
-                "Minor deviations are attributable to non-ideal diode forward drops, switch conduction resistances, and inductor series resistance. "
-                "As the load current demand was varied, the ripple magnitude scaled proportionally as expected."
+                "The simulated waveforms and parameters conformed closely to theoretical expectations. "
+                "Minor deviations are attributable to non-ideal component properties, switching resistances, and parasitic elements. "
+                "As the demand was varied, the performance scaled proportionally as expected."
             ),
             "conclusion": (
                 f"The experimental investigation and simulation of the {state['experiment_name']} was successfully performed. "
-                "The functional relationships between input voltage, duty cycle, and load parameters were validated."
+                "The functional relationships between input, load parameters, and control variables were validated."
             )
         }
     return {"report_sections": sections}
@@ -66,10 +71,8 @@ def build_graph():
     workflow.add_node("draft", draft_report)
     
     workflow.add_edge(START, "research")
-    workflow.add_edge(START, "circuit")
-    workflow.add_edge("research", "draft")
-    # drafting doesn't strictly depend on circuit in this simple version, but both go to END
-    workflow.add_edge("circuit", END)
+    workflow.add_edge("research", "circuit")
+    workflow.add_edge("circuit", "draft")
     workflow.add_edge("draft", END)
     
     return workflow.compile()
