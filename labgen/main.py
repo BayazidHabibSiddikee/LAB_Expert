@@ -51,7 +51,7 @@ def create_triac_netlist(run_dir):
     cir_path = os.path.join(run_dir, "triac_iv.cir")
     txt_out = os.path.join(run_dir, "iv_data.txt")
 
-    model_path = os.path.abspath("models/triac.sub").replace('\\', '/')
+    model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "models", "triac.sub")).replace('\\', '/')
     netlist = f"""TRIAC V-I Characteristics
 .include "{model_path}"
 
@@ -149,8 +149,8 @@ def run_generation(args, settings):
     schem_path = os.path.join(run_dir, "figs", "schematic.png")
 
     netlist_content = f"Dynamic Circuit: {args.name}\n"
-    triac_path = os.path.abspath("models/triac.sub").replace('\\', '/')
-    diac_path = os.path.abspath("models/diac.sub").replace('\\', '/')
+    triac_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "models", "triac.sub")).replace('\\', '/')
+    diac_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "models", "diac.sub")).replace('\\', '/')
     netlist_str = str(circuit_json.get("netlist_components", [])).upper()
     if "TRIAC" in netlist_str or "triac" in args.name.lower():
         netlist_content += f'.include "{triac_path}"\n'
