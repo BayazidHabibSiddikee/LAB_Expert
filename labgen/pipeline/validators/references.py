@@ -95,7 +95,7 @@ def feature_vector(report: Dict[str, Any]) -> Dict[str, float]:
 
     validity_rate = 1.0
     if ref_urls:
-        valid = sum(1 for u in ref_urls if _check_url(u))
+        valid = sum(1 for u in ref_urls if u.startswith("http"))
         validity_rate = valid / len(ref_urls)
 
     overlap_rate = 0.0
