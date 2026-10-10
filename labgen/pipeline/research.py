@@ -15,8 +15,8 @@ def get_research_context(query):
                 title = item.get("title", "No Title")
                 href = item.get("href", "No URL")
                 body = item.get("body", "No Body")
-                context_lines.append(f"[{i+1}] {title}\\nURL: {href}\\nSnippet: {body}\\n")
-            return "\\n".join(context_lines)
+                context_lines.append(f"[{i+1}] {title}\nURL: {href}\nSnippet: {body}\n")
+            return "\n".join(context_lines)
         except ImportError:
             print("Please install duckduckgo-search (pip install duckduckgo-search) for internal research fallback.")
             return "No research context available."
@@ -36,9 +36,9 @@ def get_research_context(query):
             title = item.get("title", "No Title")
             href = item.get("href", "No URL")
             body = item.get("body", "No Body")
-            context_lines.append(f"[{i+1}] {title}\\nURL: {href}\\nSnippet: {body}\\n")
+            context_lines.append(f"[{i+1}] {title}\nURL: {href}\nSnippet: {body}\n")
 
-        return "\\n".join(context_lines)
+        return "\n".join(context_lines)
 
     except subprocess.CalledProcessError as e:
         print(f"Error calling knowledge_hub.py: {e.stderr}")
