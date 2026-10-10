@@ -7,13 +7,13 @@
     "temperature": 0.2
   },
   "verification": {
-    "enabled": true,
+    "enabled": false,
     "classifier_path": "models/verifier_classifier.txt",
     "feature_names_path": "models/feature_names.json",
     "threshold": 0.5
   },
   "rag": {
-    "enabled": true,
+    "enabled": false,
     "use_web": true,
     "top_k": 5,
     "ocr_enabled": true,
@@ -21,7 +21,7 @@
     "ocr_dpi": 200
   },
   "freecad": {
-    "enabled": true,
+    "enabled": false,
     "cmd": "freecadcmd",
     "timeout": 120,
     "training_data_dir": "freecad_training_data",
