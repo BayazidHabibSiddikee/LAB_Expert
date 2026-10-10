@@ -119,7 +119,66 @@ Ig 0 3 DC 5m
         logger.error(f"Error building data table: {e}")
         return ""
 
+
+def _build_data_table_from_simulation(txt_out: str) -> str:
+    import os
+    import pandas as pd
+    
+    if not os.path.exists(txt_out):
+        if os.path.exists(txt_out.replace('.txt', '_0_tran.txt')):
+            txt_out = txt_out.replace('.txt', '_0_tran.txt')
+        elif os.path.exists(txt_out.replace('.txt', '_tran.txt')):
+            txt_out = txt_out.replace('.txt', '_tran.txt')
+        elif os.path.exists(txt_out.replace('.txt', '_0.txt')):
+            txt_out = txt_out.replace('.txt', '_0.txt')
+            
+    if not os.path.exists(txt_out):
+        return ""
+        
+    try:
+        df = pd.read_csv(txt_out, sep=r'\s+', header=None)
+        if df.shape[1] >= 4:
+            v = df[1]
+            i = df[3]
+        elif df.shape[1] >= 2:
+            v = df[0]
+            i = df[1]
+        else:
+            return ""
+
+        v_sorted, i_sorted = zip(*sorted(zip(v, i)))
+        v_sorted = list(v_sorted)
+        i_sorted = list(i_sorted)
+
+        n_points = min(10, len(v_sorted))
+        if n_points <= 1:
+            indices = [0] if n_points == 1 else []
+        else:
+            indices = [int(j * (len(v_sorted) - 1) / (n_points - 1)) for j in range(n_points)]
+
+        rows = []
+        for idx in indices:
+            v_val = v_sorted[idx]
+            i_val = i_sorted[idx] * 1000
+            rows.append(f"        {v_val:.1f} & {i_val:.1f} \\\\")
+
+        table = f"""\begin{{table}}[H]
+    \centering
+    \begin{{tabular}}{{|c|c|}}
+        \hline
+        \textbf{{Voltage / Time}} & \textbf{{Current / Voltage}} \\\\
+        \hline
+{chr(10).join(rows)}
+        \hline
+    \end{{tabular}}
+    \caption{{Simulated Data (Sample Points)}}
+\end{{table}}"""
+        return table
+    except Exception as e:
+        return ""
+
 def run_generation(args, settings):
+
     slug = args.name.lower().replace(" ", "_")
     run_dir = os.path.join("runs", slug)
     os.makedirs(run_dir, exist_ok=True)
