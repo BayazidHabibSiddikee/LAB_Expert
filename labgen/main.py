@@ -385,6 +385,8 @@ def run_generation(args, settings):
         try:
             if os.path.exists(txt_out.replace('.txt', '_0.txt')):
                 shutil.copy(txt_out.replace('.txt', '_0.txt'), txt_out)
+            if os.path.exists(txt_out.replace('.txt', '_0_tran.txt')):
+                shutil.copy(txt_out.replace('.txt', '_0_tran.txt'), txt_out.replace('.txt', '_tran.txt'))
         except:
             pass
             
@@ -401,7 +403,10 @@ def run_generation(args, settings):
         plt.ylabel("Voltage (V)", fontsize=12)
         plt.grid(True, which='both', linestyle='--', linewidth=0.5)
         for r_val, color, df_tran in tran_data:
-            plt.plot(df_tran[0] * 1000, df_tran[1], linewidth=2, color=color, label=f"R={r_val}")
+            if df_tran.shape[1] >= 4:
+                plt.plot(df_tran[1] * 1000, df_tran[3], linewidth=2, color=color, label=f"R={r_val}")
+            elif df_tran.shape[1] >= 2:
+                plt.plot(df_tran[0] * 1000, df_tran[1], linewidth=2, color=color, label=f"R={r_val}")
         plt.legend()
         plt.tight_layout()
         tran_plot_path = os.path.join(run_dir, "figs", f"{slug}_tran_plot.png")
