@@ -35,7 +35,6 @@ def execute_and_validate(script_code: str, output_path: str) -> Optional[str]:
     
     with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False) as f:
         full_code = script_code + f"""\n
-import cadquery as cq
 if 'result' in locals():
     try:
         cq.exporters.export(result, '{step_path}')
