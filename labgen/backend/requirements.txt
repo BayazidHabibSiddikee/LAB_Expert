@@ -25,4 +25,6 @@ requests>=2.31
 pdf2image>=1.16
 pytesseract>=0.3
 pillow>=10.0
-rank_bm25>=0.2
+rank_bm25>=0.2tenacity
+cadquery
+duckduckgo-search

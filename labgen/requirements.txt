@@ -14,4 +14,10 @@ scikit-learn
 sentence-transformers
 faiss-cpu
 spacy
-requests
+requeststenacity
+rank_bm25
+pdf2image
+pytesseract
+pillow
+jinja2
+cadquery
