@@ -129,6 +129,7 @@ class GenerateRequest(BaseModel):
     section: str = "A"
     group: int = 1
     cadPrompt: str = ""
+    fluidsimPrompt: str = ""
 
 class VerifyRequest(BaseModel):
     reportPath: str
@@ -190,8 +191,9 @@ class InterventionResponse(BaseModel):
     params: Optional[dict] = None
 
 # WebSocket endpoint
+from fastapi import Query
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, api_key: str = None):
+async def websocket_endpoint(websocket: WebSocket, api_key: str = Query(None)):
     from pydantic import ValidationError
     if not verify_api_key(api_key):
         await websocket.close(code=1008)
@@ -285,7 +287,7 @@ async def generate_report(request: GenerateRequest, background_tasks: Background
     }
 
 @app.websocket("/ws/generate/{report_id}")
-async def generate_websocket(websocket: WebSocket, report_id: str, api_key: str = None):
+async def generate_websocket(websocket: WebSocket, report_id: str, api_key: str = Query(None)):
     if not verify_api_key(api_key):
         await websocket.close(code=1008)
         return
@@ -333,7 +335,9 @@ async def run_generation_with_progress(websocket: WebSocket, report_id: str, par
         exp_num = str(params.get("experimentNumber", 2))
         circuit_prompt = params.get("circuitPrompt", "")
         cad_prompt = params.get("cadPrompt", "")
+        fluidsim_prompt = params.get("fluidsimPrompt", "")
         cad_requested = bool(cad_prompt)
+        fluidsim_requested = bool(fluidsim_prompt)
         
         # Stage 1: Heuristic Gating
         await emit_stage_event(websocket, report_id, "stage_start", "heuristic", {
@@ -346,6 +350,8 @@ async def run_generation_with_progress(websocket: WebSocket, report_id: str, par
             cmd.append(circuit_prompt)
         if cad_prompt:
             cmd.extend(["--cad-prompt", cad_prompt])
+        if fluidsim_prompt:
+            cmd.extend(["--fluidsim-prompt", fluidsim_prompt])
             
         labgen_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         
@@ -529,6 +535,11 @@ async def run_generation_with_progress(websocket: WebSocket, report_id: str, par
             for csv_file in csv_files:
                 assets.append({"type": "csv", "path": str(csv_file), "label": f"Simulation Data ({csv_file.name})"})
             
+            fluid_files = list(run_dir.glob("*.ct")) + list(run_dir.glob("*.json"))
+            for fluid_file in fluid_files:
+                # Use 'net' type icon for fluidsim files as well for now
+                assets.append({"type": "net", "path": str(fluid_file), "label": f"FluidSim Model ({fluid_file.name})"})
+            
             # Also check for STEP files for 3D viewer
             step_files = list(run_dir.glob("*.step")) + list(run_dir.glob("*.stl"))
             for step_file in step_files:
@@ -559,14 +570,14 @@ async def run_generation_with_progress(websocket: WebSocket, report_id: str, par
                     body = latex_text
                     if r"\begin{document}" in body:
                         body = body.split(r"\begin{document}")[1].split(r"\end{document}")[0]
-                    body = re.sub(r"\section\*?\{([^}]+)\}", r"## \n", body)
-                    body = re.sub(r"\subsection\*?\{([^}]+)\}", r"### \n", body)
-                    body = re.sub(r"\textbf\{([^}]+)\}", r"****", body)
-                    body = re.sub(r"\textit\{([^}]+)\}", r"**", body)
-                    body = re.sub(r"\item", r"- ", body)
-                    body = re.sub(r"\begin\{itemize\}|\end\{itemize\}", "", body)
-                    body = re.sub(r"\begin\{enumerate\}|\end\{enumerate\}", "", body)
-                    body = re.sub(r"\begin\{figure\}.*?\end\{figure\}", "[Simulation Plot / Schematic]", body, flags=re.DOTALL)
+                    body = re.sub(r"\\section\*?\{([^}]+)\}", r"## \n", body)
+                    body = re.sub(r"\\subsection\*?\{([^}]+)\}", r"### \n", body)
+                    body = re.sub(r"\\textbf\{([^}]+)\}", r"****", body)
+                    body = re.sub(r"\\textit\{([^}]+)\}", r"**", body)
+                    body = re.sub(r"\\item", r"- ", body)
+                    body = re.sub(r"\\begin\{itemize\}|\end\{itemize\}", "", body)
+                    body = re.sub(r"\\begin\{enumerate\}|\end\{enumerate\}", "", body)
+                    body = re.sub(r"\\begin\{figure\}.*?\end\{figure\}", "[Simulation Plot / Schematic]", body, flags=re.DOTALL)
                     markdown_text = f"# {exp_name}\n\n" + body.strip()
                 except Exception as e:
                     pass
@@ -637,19 +648,20 @@ Be helpful, professional, and clear."""
         return {"reply": reply}
     except Exception as e:
         is_buck_boost = any(k in user_msg.lower() for k in ["buck", "boost", "converter", "inverting"])
+        is_fluidsim = any(k in user_msg.lower() for k in ["fluid", "pneumatic", "hydraulic", "cylinder", "valve"])
         if is_buck_boost:
             reply = """### Analysis: Inverting Buck-Boost Converter
-
+            
 In continuous conduction mode (CCM), the output voltage is governed by:
-$$V_{out} = -V_{in} \frac{D}{1-D}$$
+$$V_{out} = -V_{in} \\frac{D}{1-D}$$
 
 **Recommended Parameters:**
 - **$V_{in}$**: 12V DC
 - **Switching Frequency ($f_s$)**: 50 kHz
-- **Inductor ($L_1$)**: $100\mu H$ (CCM boundary limit)
-- **Capacitor ($C_1$)**: $470\mu F$ low-ESR electrolytic
-- **Load Resistor ($R_L$)**: $10\Omega$ (Nominal CCM load)
-- **Duty Cycle ($D$)**: 0.5 (Unity mode $\rightarrow V_{out} \approx -12V$)
+- **Inductor ($L_1$)**: $100\\mu H$ (CCM boundary limit)
+- **Capacitor ($C_1$)**: $470\\mu F$ low-ESR electrolytic
+- **Load Resistor ($R_L$)**: $10\\Omega$ (Nominal CCM load)
+- **Duty Cycle ($D$)**: 0.5 (Unity mode $\\rightarrow V_{out} \\approx -12V$)
 
 Ready to synthesize the complete lab report, SPICE simulation waveforms, and 3D CAD mechanical model. Click **Confirm & Build System** below to generate!
 
@@ -662,6 +674,21 @@ Ready to synthesize the complete lab report, SPICE simulation waveforms, and 3D 
 }
 ```
 """
+        elif is_fluidsim:
+            reply = f"""### Analysis: FluidSim Pneumatic/Hydraulic Circuit
+            
+I have reviewed your request for a FluidSim simulation.
+
+```json:proposal
+{{
+  "experimentName": "Pneumatic Control Simulation",
+  "experimentNumber": 3,
+  "circuitPrompt": "N/A",
+  "fluidsimPrompt": "{user_msg[:200]}",
+  "cadPrompt": "Pneumatic valve manifold and cylinder mounting bracket"
+}}
+```
+"""
         else:
             reply = f"""### LabGen Circuit Assistant
 
@@ -671,15 +698,17 @@ I can configure and automate:
 1. **Dynamic SPICE netlist & multi-condition simulation**
 2. **Schematic drawing generation**
 3. **Parametric 3D CAD modeling (STEP & STL)**
-4. **Publication-grade LaTeX/PDF lab report synthesis**
+4. **FluidSim Pneumatic/Hydraulic models**
+5. **Publication-grade LaTeX/PDF lab report synthesis**
 
 ```json:proposal
-{
+{{
   "experimentName": "Laboratory Experiment",
-  "experimentNumber": 2,
+  "experimentNumber": 4,
   "circuitPrompt": "{user_msg[:200]}",
-  "cadPrompt": "Electronics enclosure with ventilation slots and mounting tabs"
-}
+  "cadPrompt": "Electronics enclosure with ventilation slots and mounting tabs",
+  "fluidsimPrompt": ""
+}}
 ```
 """
         return {"reply": reply}
@@ -688,13 +717,33 @@ I can configure and automate:
 async def verify_report(request: VerifyRequest):
     """Verify an existing report"""
     try:
-        return {
-            "status": "verified",
-            "summary": {
-                "passed": True,
-                "failures": 0,
-                "warnings": 0
+        import subprocess
+        labgen_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        
+        # Output to a temporary file
+        out_path = f"/tmp/verify_{uuid.uuid4().hex}.json"
+        
+        cmd = ["python", "main.py", "verify", request.reportPath, "--experiment", request.experimentName]
+        if request.dataPath:
+            cmd.extend(["--data", request.dataPath])
+        cmd.extend(["--output", out_path])
+        
+        process = subprocess.run(cmd, cwd=labgen_dir, capture_output=True, text=True)
+        
+        if os.path.exists(out_path):
+            with open(out_path, "r") as f:
+                results = json.load(f)
+            os.remove(out_path)
+            return {
+                "status": "verified",
+                "summary": results.get("summary", {"passed": True, "failures": 0, "warnings": 0}),
+                "details": results
             }
+            
+        return {
+            "status": "error",
+            "message": "Verification failed to produce output",
+            "log": process.stderr or process.stdout
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -744,7 +793,7 @@ async def get_report_asset(report_id: str, asset_path: str):
         media_type = "application/octet-stream"
         if asset_file.suffix == ".pdf":
             media_type = "application/pdf"
-        elif asset_file.suffix in [".csv", ".txt"]:
+        elif asset_file.suffix in [".csv", ".txt", ".json", ".ct"]:
             media_type = "text/plain"
         elif asset_file.suffix in [".net", ".cir", ".tex"]:
             media_type = "text/plain"
