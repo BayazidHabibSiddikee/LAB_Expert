@@ -26,10 +26,17 @@ def validate_schemdraw_ast(code):
         return False
     for node in ast.walk(tree):
         if isinstance(node, (ast.Import, ast.ImportFrom)):
+            # allow schemdraw imports
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name not in ['schemdraw', 'schemdraw.elements']:
+                        return False
+            elif isinstance(node, ast.ImportFrom):
+                if node.module not in ['schemdraw', 'schemdraw.elements']:
+                    return False
+        elif isinstance(node, ast.Name) and node.id in ['eval', 'exec', 'open', '__import__', 'globals', 'locals']:
             return False
-        if isinstance(node, ast.Name) and node.id in ['eval', 'exec', 'open', '__import__', 'globals', 'locals']:
-            return False
-        if isinstance(node, ast.Attribute) and node.attr.startswith('__'):
+        elif isinstance(node, ast.Attribute) and node.attr.startswith('__'):
             return False
     return True
 
