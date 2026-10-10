@@ -79,65 +79,31 @@ Ig 0 3 DC 5m
         f.write(netlist)
     return cir_path, txt_out
 
-        txt_out = txt_out.replace('.txt', '_tran.txt')
-    try:
-        df = pd.read_csv(txt_out, sep=r'\s+', header=None)
-        if df.shape[1] >= 4:
-            v = df[1]
-            i = df[3]
-        elif df.shape[1] >= 2:
-            v = df[0]
-            i = df[1]
-        else:
-            return ""
-
-        v_sorted = list(v)
-        i_sorted = list(i)
-
-        n_points = min(10, len(v_sorted))
-        indices = [int(j * (len(v_sorted) - 1) / (n_points - 1)) for j in range(n_points)]
-
-        rows = []
-        for idx in indices:
-            v_val = v_sorted[idx]
-            i_val = i_sorted[idx] * 1000
-            rows.append(f"        {v_val:.1f} & {i_val:.1f} \\\\")
-
-        table = f"""\\begin{{table}}[H]
-    \\centering
-    \\begin{{tabular}}{{|c|c|}}
-        \\hline
-        \\textbf{{Voltage (V)}} & \\textbf{{Current (mA)}} \\\\
-        \\hline
-{chr(10).join(rows)}
-        \\hline
-    \\end{{tabular}}
-    \\caption{{Simulated Data (Sample Points)}}
-\\end{{table}}"""
-        return table
-    except Exception as e:
-        logger.error(f"Error building data table: {e}")
-        return ""
-
 
 def _build_data_table_from_simulation(txt_out: str) -> str:
-    import os
-    import pandas as pd
-    
+    """Build a LaTeX table from ngspice wrdata output.
+
+    ngspice wrdata with two signals produces 4-column output:
+        index  val1  index  val2
+    so actual values are in columns 1 and 3 (0-indexed).
+    """
     if not os.path.exists(txt_out):
-        if os.path.exists(txt_out.replace('.txt', '_0_tran.txt')):
-            txt_out = txt_out.replace('.txt', '_0_tran.txt')
-        elif os.path.exists(txt_out.replace('.txt', '_tran.txt')):
-            txt_out = txt_out.replace('.txt', '_tran.txt')
-        elif os.path.exists(txt_out.replace('.txt', '_0.txt')):
-            txt_out = txt_out.replace('.txt', '_0.txt')
-            
+        for candidate in [
+            txt_out.replace('.txt', '_0_tran.txt'),
+            txt_out.replace('.txt', '_tran.txt'),
+            txt_out.replace('.txt', '_0.txt'),
+        ]:
+            if os.path.exists(candidate):
+                txt_out = candidate
+                break
+
     if not os.path.exists(txt_out):
         return ""
-        
+
     try:
         df = pd.read_csv(txt_out, sep=r'\s+', header=None)
         if df.shape[1] >= 4:
+            # 4-col wrdata: [idx, V, idx, I]
             v = df[1]
             i = df[3]
         elif df.shape[1] >= 2:
@@ -162,19 +128,23 @@ def _build_data_table_from_simulation(txt_out: str) -> str:
             i_val = i_sorted[idx] * 1000
             rows.append(f"        {v_val:.1f} & {i_val:.1f} \\\\")
 
-        table = f"""\begin{{table}}[H]
-    \centering
-    \begin{{tabular}}{{|c|c|}}
-        \hline
-        \textbf{{Voltage / Time}} & \textbf{{Current / Voltage}} \\\\
-        \hline
-{chr(10).join(rows)}
-        \hline
-    \end{{tabular}}
-    \caption{{Simulated Data (Sample Points)}}
-\end{{table}}"""
+        row_block = "\n".join(rows)
+        table = (
+            "\\begin{table}[H]\n"
+            "    \\centering\n"
+            "    \\begin{tabular}{|c|c|}\n"
+            "        \\hline\n"
+            "        \\textbf{Voltage / Time} & \\textbf{Current / Voltage} \\\\\n"
+            "        \\hline\n"
+            f"{row_block}\n"
+            "        \\hline\n"
+            "    \\end{tabular}\n"
+            "    \\caption{Simulated Data (Sample Points)}\n"
+            "\\end{table}"
+        )
         return table
     except Exception as e:
+        logger.error(f"Error building data table: {e}")
         return ""
 
 def run_generation(args, settings):

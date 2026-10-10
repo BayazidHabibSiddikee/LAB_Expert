@@ -1,9 +1,9 @@
 {
   "llm": {
-    "provider": "custom",
+    "provider": "openai",
     "base_url": "https://router.bynara.id/v1",
-    "api_key": "YOUR_API_KEY_HERE",
-    "model": "nemotron-3.5-lightning-free",
+    "api_key": "sk-nry-TeauyPpk2F3OHFaHuZunwEJaj6j_cJbftoPCMITEc_4",
+    "model": "agnes-3-flash",
     "temperature": 0.2
   },
   "verification": {

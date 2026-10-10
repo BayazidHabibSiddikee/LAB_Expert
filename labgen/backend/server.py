@@ -269,7 +269,7 @@ async def health_check():
         "verification": "ready" if classifier else "disabled",
         "freecad": "ready" if shutil.which("freecadcmd") else "missing",
         "ngspice": "ready" if shutil.which("ngspice") else "missing",
-        "pdflatex": "ready" if shutil.which("pdflatex") else "missing",
+        "tectonic": "ready" if shutil.which("tectonic") else "missing",
         "api_key": "configured" if get_api_key() else "missing",
     }
     
@@ -622,10 +622,10 @@ async def run_generation_with_progress(websocket: WebSocket, report_id: str, par
                     body = latex_text
                     if r"\begin{document}" in body:
                         body = body.split(r"\begin{document}")[1].split(r"\end{document}")[0]
-                    body = re.sub(r"\\section\*?\{([^}]+)\}", r"## \n", body)
-                    body = re.sub(r"\\subsection\*?\{([^}]+)\}", r"### \n", body)
-                    body = re.sub(r"\\textbf\{([^}]+)\}", r"****", body)
-                    body = re.sub(r"\\textit\{([^}]+)\}", r"**", body)
+                    body = re.sub(r"\\section\*?\{([^}]+)\}", r"## \1\n", body)
+                    body = re.sub(r"\\subsection\*?\{([^}]+)\}", r"### \1\n", body)
+                    body = re.sub(r"\\textbf\{([^}]+)\}", r"**\1**", body)
+                    body = re.sub(r"\\textit\{([^}]+)\}", r"*\1*", body)
                     body = re.sub(r"\\item", r"- ", body)
                     body = re.sub(r"\\begin\{itemize\}|\end\{itemize\}", "", body)
                     body = re.sub(r"\\begin\{enumerate\}|\end\{enumerate\}", "", body)
@@ -676,27 +676,35 @@ class ChatRequest(BaseModel):
 async def chat_assistant(request: ChatRequest):
     """Interactive EEE LabGen Chatbot Assistant"""
     user_msg = request.messages[-1].content if request.messages else ""
-    system_prompt = """You are LabGen AI Co-Pilot, an expert professor and engineer in Electrical & Electronic Engineering.
-You assist students and researchers in formulating circuit topologies, theoretical equations, simulation parameters, and CAD constraints.
-
-When the user specifies or discusses an experiment:
-1. Provide a concise, clear technical explanation with key equations (e.g. duty cycle formulas, ripple, transfer functions).
-2. Give recommended simulation values (Vin, L, C, R, switching frequency, device part numbers).
-3. Conclude with a structured LabGen System Proposal enclosed in a ```json:proposal code block so the user can review and build it with one click:
-```json:proposal
-{
-  "experimentName": "Title of Experiment",
-  "experimentNumber": 2,
-  "circuitPrompt": "Detailed circuit description and components",
-  "cadPrompt": "3D CAD enclosure or heatsink description"
-}
-```
-Be helpful, professional, and clear."""
+    system_prompt = (
+        "You are LabGen AI Co-Pilot — a world-class Electrical & Electronic Engineering professor, "
+        "circuit designer, and simulation expert with deep knowledge of power electronics, analog/digital circuits, "
+        "control systems, and embedded systems.\n\n"
+        "Your job is to THINK DEEPLY and help users design complete laboratory experiments from scratch. "
+        "You reason step-by-step through circuit topology choices, component selection, governing equations, "
+        "expected simulation behaviour, and potential failure modes BEFORE giving recommendations.\n\n"
+        "When the user describes an experiment or circuit:\n"
+        "1. THINK THROUGH the physics and topology — explain why certain component values and architectures are chosen.\n"
+        "2. Derive or state the key governing equations (duty cycle, ripple, transfer function, trigger voltage, etc.).\n"
+        "3. Give concrete recommended simulation values: Vin, L, C, R, frequency, device part numbers.\n"
+        "4. Identify any non-ideal effects or gotchas the student should watch for.\n"
+        "5. End EVERY response with a structured LabGen System Proposal in a ```json:proposal``` block:\n\n"
+        "```json:proposal\n"
+        "{\n"
+        '  "experimentName": "Full descriptive experiment title",\n'
+        '  "experimentNumber": 2,\n'
+        '  "circuitPrompt": "Detailed ngspice-ready circuit description with component values",\n'
+        '  "cadPrompt": "3D enclosure / heatsink / mechanical fixture description"\n'
+        "}\n"
+        "```\n\n"
+        "Be technically rigorous, use LaTeX math ($...$), and keep explanations clear for a 3rd-year EEE student."
+    )
 
     try:
         from pipeline.llm import call_llm
-        prompt = "\n".join([f"{m.role}: {m.content}" for m in request.messages[-5:]])
-        reply = call_llm(system_prompt, prompt, response_json=False)
+        # Send full conversation history (last 8 messages for context)
+        history = "\n".join([f"{m.role.upper()}: {m.content}" for m in request.messages[-8:]])
+        reply = call_llm(system_prompt, history, response_json=False)
         return {"reply": reply}
     except Exception as e:
         is_buck_boost = any(k in user_msg.lower() for k in ["buck", "boost", "converter", "inverting"])

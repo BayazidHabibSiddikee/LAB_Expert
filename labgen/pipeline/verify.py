@@ -10,12 +10,45 @@ def run_all_checks(report: Dict[str, Any]) -> Dict[str, Any]:
     print("Running Verification Pipeline...")
     issues = []
 
+    # Each validator module exposes exactly one check_* function.
+    # Map module names to their check function for a clean dispatch.
+    _DISPATCH = {
+        "text":       "check_text",
+        "data":       "check_data",
+        "structure":  "check_structure",
+        "circuit":    "check_circuit",
+        "references": "check_references",
+        "semantics":  "check_semantics",
+    }
+
     for validator in ALL_VALIDATORS:
+        module_name = validator.__name__.split(".")[-1]
+        fn_name = _DISPATCH.get(module_name)
+        fn = getattr(validator, fn_name, None) if fn_name else None
+
+        # Fallback: find any check_* method if the name isn't in the dispatch table
+        if fn is None:
+            for candidate in dir(validator):
+                if candidate.startswith("check_"):
+                    fn = getattr(validator, candidate)
+                    break
+
+        if fn is None:
+            issues.append({
+                "module": module_name,
+                "severity": "low",
+                "category": "validator_error",
+                "message": f"No check_* function found in validator '{module_name}'",
+                "location": {}
+            })
+            continue
+
         try:
-            issues.extend(validator.check_text(report) if hasattr(validator, "check_text") else validator.check_data(report) if hasattr(validator, "check_data") else validator.check_structure(report) if hasattr(validator, "check_structure") else validator.check_circuit(report) if hasattr(validator, "check_circuit") else validator.check_references(report) if hasattr(validator, "check_references") else validator.check_semantics(report))
+            result = fn(report)
+            issues.extend(result)
         except Exception as e:
             issues.append({
-                "module": validator.__name__.split(".")[-1],
+                "module": module_name,
                 "severity": "low",
                 "category": "validator_error",
                 "message": f"Validator failed: {e}",

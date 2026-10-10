@@ -3,15 +3,16 @@
 \usepackage{graphicx}
 \usepackage{geometry}
 \usepackage{amsmath}
-\usepackage{tgtermes} % Times New Roman equivalent for XeTeX
-\usepackage[font={small,it}]{caption} % size 11 (small is 11pt for 12pt document) and italic
+% Font: mathptmx provides Times New Roman body + math fonts and works with
+% both pdflatex and tectonic without requiring the tgtermes package.
+\usepackage{mathptmx}
+\usepackage[font={small,it}]{caption}
 \usepackage{float}
 \usepackage{booktabs}
 \usepackage{hyperref}
 \usepackage{siunitx}
-\usepackage{sectsty} % For customizing section headings
-% In a 12pt document, \normalsize is 12pt. \bfseries makes it bold.
-\sectionfont{\fontsize{12}{14}\bfseries\selectfont} 
+\usepackage{sectsty}
+\sectionfont{\fontsize{12}{14}\bfseries\selectfont}
 
 \geometry{
   a4paper,
@@ -25,42 +26,41 @@
 
 % --- Cover Page ---
 \begin{titlepage}
-    % Use default font for cover
     \centering
     \vspace*{1cm}
-    
+
     {% if config.university %}
-    \Large \textbf{\MakeUppercase{ {{ config.university }} }} \\
+    \Large \textbf{\MakeUppercase{ {{ config.university | latex_escape }} }} \\
     \vspace{0.5cm}
     {% endif %}
     {% if config.department %}
-    \large \textbf{\MakeUppercase{ {{ config.department }} }} \\
+    \large \textbf{\MakeUppercase{ {{ config.department | latex_escape }} }} \\
     \vspace{2.5cm}
     {% endif %}
-    
+
     \Large \textbf{LABORATORY REPORT} \\
     \vspace{1cm}
-    
+
     \begin{tabular}{ll}
-        \textbf{Course No:} & {{ config.course_code if config.course_code else "—" }} \\
-        \textbf{Course Title:} & {{ config.course_name if config.course_name else "—" }} \\
+        \textbf{Course No:} & {{ config.course_code | latex_escape if config.course_code else "---" }} \\
+        \textbf{Course Title:} & {{ config.course_name | latex_escape if config.course_name else "---" }} \\
     \end{tabular}
-    
+
     \vspace{2cm}
-    
+
     \textbf{Experiment No:} {{ experiment_no }} \\
     \vspace{0.5cm}
     \textbf{Name of the Experiment:} \\
-    \Large \textbf{ {{ experiment_name }} } \\
-    
+    \Large \textbf{ {{ experiment_name | latex_escape }} } \\
+
     \vspace{2.5cm}
-    
+
     \begin{minipage}[t]{0.4\textwidth}
         \begin{flushleft} \large
             \emph{Submitted by:}\\
-            {% if config.student.name %}{{ config.student.name }} \\{% endif %}
-            {% if config.student.roll %}Roll: {{ config.student.roll }} \\{% endif %}
-            {% if config.student.section or config.student.group %}Section: {{ config.student.section if config.student.section else "—" }}, Group: {{ config.student.group if config.student.group else "—" }}{% endif %}
+            {% if config.student.name %}{{ config.student.name | latex_escape }} \\{% endif %}
+            {% if config.student.roll %}Roll: {{ config.student.roll | latex_escape }} \\{% endif %}
+            {% if config.student.section or config.student.group %}Section: {{ config.student.section | latex_escape if config.student.section else "---" }}, Group: {{ config.student.group | latex_escape if config.student.group else "---" }}{% endif %}
         \end{flushleft}
     \end{minipage}
     \hfill
@@ -69,12 +69,12 @@
             \emph{Submitted to:} \\
             {% if config.teachers %}
             {% for teacher in config.teachers %}
-            {% if teacher.name %}{{ teacher.name }} \\{% endif %}
-            {% if teacher.designation %}{{ teacher.designation }}{% if not loop.last %} \\{% endif %}{% endif %}
+            {% if teacher.name %}{{ teacher.name | latex_escape }} \\{% endif %}
+            {% if teacher.designation %}{{ teacher.designation | latex_escape }}{% if not loop.last %} \\{% endif %}{% endif %}
             {% if not loop.last %}\vspace{0.3cm}{% endif %}
             {% endfor %}
             {% else %}
-            — \\
+            --- \\
             {% endif %}
         \end{flushright}
     \end{minipage}
@@ -82,18 +82,17 @@
     \vfill
     \textbf{Date of Performance:} {{ date_performance }} \\
     \textbf{Date of Submission:} {{ date_submission }}
-    
+
 \end{titlepage}
 
 % --- Main Content ---
 \setcounter{page}{1}
-% Back to normal font
 \normalsize
 
 \begin{center}
     \textbf{Experiment No:} {{ experiment_no }} \\
     \vspace{0.2cm}
-    \textbf{Name of the Experiment:} {{ experiment_name }}
+    \textbf{Name of the Experiment:} {{ experiment_name | latex_escape }}
 \end{center}
 \vspace{0.5cm}
 
@@ -112,8 +111,8 @@
 {% if theory_img %}
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.8\textwidth]{ {{- theory_img -}} }
-    \caption{Reference diagram}
+    \includegraphics[width=0.8\textwidth]{ {{- theory_img | latex_path -}} }
+    \caption{Reference Diagram}
 \end{figure}
 {% endif %}
 
@@ -123,7 +122,7 @@
 {% if circuit_img %}
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.8\textwidth]{ {{- circuit_img -}} }
+    \includegraphics[width=0.8\textwidth]{ {{- circuit_img | latex_path -}} }
     \caption{Experimental Circuit Diagram}
 \end{figure}
 {% endif %}
@@ -131,7 +130,7 @@
 \section{Required Apparatus}
 \begin{itemize}
 {% for app in sections.apparatus %}
-    \item {{ app.name }} (Quantity: {{ app.quantity }})
+    \item {{ app.name | latex_escape }} (Quantity: {{ app.quantity }})
 {% endfor %}
 \end{itemize}
 
@@ -149,8 +148,8 @@
 {% if plot.path %}
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.8\textwidth]{ {{- plot.path -}} }
-    \caption{ {{ plot.caption }} }
+    \includegraphics[width=0.8\textwidth]{ {{- plot.path | latex_path -}} }
+    \caption{ {{ plot.caption | latex_escape }} }
 \end{figure}
 {% endif %}
 {% endfor %}
