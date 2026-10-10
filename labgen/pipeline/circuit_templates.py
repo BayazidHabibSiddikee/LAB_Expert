@@ -28,11 +28,13 @@ def get_buck_boost_template(exp_name: str, prompt: str) -> Dict[str, Any]:
         ],
         "netlist_components": [
             "V1 1 0 DC 12",
-            "Rin 1 2 0.1",
+            "Vpwm 4 0 PULSE(0 5 0 1n 1n 10u 20u)",
+            "S1 1 2 4 0 myswitch",
             "L1 2 0 100u",
             "D1 3 2 D1N4148",
             "C1 3 0 470u",
             "Rload 3 0 10",
+            ".model myswitch SW(Ron=0.1 Roff=1Meg Vt=2.5)",
             ".model D1N4148 D(Is=2.52n Rs=0.568 N=1.752 Cjo=4p M=0.333 tt=5.76n)"
         ],
         "schemdraw_code": (
@@ -111,9 +113,12 @@ def get_fallback_circuit(exp_name: str, prompt: str) -> Dict[str, Any]:
             "netlist_components": [
                 "V1 1 0 DC 12",
                 "L1 1 2 220u",
+                "Vpwm 4 0 PULSE(0 5 0 1n 1n 10u 20u)",
+                "S1 2 0 4 0 myswitch",
                 "D1 2 3 D1N4148",
                 "C1 3 0 220u",
                 "Rload 3 0 50",
+                ".model myswitch SW(Ron=0.1 Roff=1Meg Vt=2.5)",
                 ".model D1N4148 D"
             ],
             "schemdraw_code": (
