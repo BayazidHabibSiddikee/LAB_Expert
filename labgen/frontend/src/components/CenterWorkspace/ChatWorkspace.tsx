@@ -11,6 +11,7 @@ export interface CircuitProposal {
   experimentNumber?: number;
   circuitPrompt: string;
   cadPrompt?: string;
+  fluidsimPrompt?: string;
 }
 
 interface Message {
@@ -87,7 +88,10 @@ export function ChatWorkspace({ onConfirmBuild, isGenerating }: ChatWorkspacePro
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-API-Key': import.meta.env.VITE_API_KEY || ''
+        },
         body: JSON.stringify({
           messages: [...messages, userMessage].map((m) => ({
             role: m.role,

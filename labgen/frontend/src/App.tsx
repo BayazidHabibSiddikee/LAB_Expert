@@ -229,6 +229,7 @@ export function App() {
       experimentNumber: proposal.experimentNumber || formData.experimentNumber || 2,
       circuitDescription: proposal.circuitPrompt,
       cadParameters: proposal.cadPrompt ? { description: proposal.cadPrompt } : formData.cadParameters,
+      fluidsimPrompt: proposal.fluidsimPrompt,
     };
     setFormData(updatedFormData);
     setCenterTab('preview');

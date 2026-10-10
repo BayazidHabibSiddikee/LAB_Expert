@@ -54,6 +54,7 @@ export interface FormData {
   circuitDescription: string;
   boundaryConditions: Record<string, string>;
   cadParameters: Record<string, string>;
+  fluidsimPrompt?: string;
 }
 
 export const PIPELINE_STAGES: PipelineStage[] = [
