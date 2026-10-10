@@ -45,9 +45,9 @@ if 'result' in locals():
     except Exception as e:
         pass
     try:
-        cq.exporters.export(result, '{svg_path}')
+        cq.exporters.export(result, '{svg_path}', opt={'width': 800, 'height': 800})
     except Exception as e:
-        pass
+        print('SVG Export Error:', e)
 else:
     raise ValueError('Variable "result" not found in script')
 """
@@ -91,9 +91,9 @@ def generate_fallback_cad(spec: str, output_path: str) -> bool:
         cq.exporters.export(result, step_path)
         cq.exporters.export(result, stl_path)
         try:
-            cq.exporters.export(result, svg_path)
-        except Exception:
-            pass
+            cq.exporters.export(result, svg_path, opt={'width': 800, 'height': 800})
+        except Exception as e:
+            print('SVG Fallback Export Error:', e)
         return True
     except Exception as e:
         print(f"Fallback CAD generation error: {e}")
