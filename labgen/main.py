@@ -305,10 +305,11 @@ def run_generation(args, settings):
 .endc
 .end
 """
-        with open(cir_path, 'w') as f:
+        loop_cir_path = cir_path.replace('.cir', f'_{r_idx}.cir')
+        with open(loop_cir_path, 'w') as f:
             f.write(loop_netlist)
             
-        res = subprocess.run(["ngspice", "-b", cir_path], capture_output=True)
+        res = subprocess.run(["ngspice", "-b", loop_cir_path], capture_output=True)
         if res.returncode == 0 and (os.path.exists(loop_txt_out) or os.path.exists(loop_txt_out.replace('.txt', '_tran.txt'))):
             success_sim = True
             if os.path.exists(loop_txt_out):
