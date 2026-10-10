@@ -24,7 +24,7 @@ from pydantic import BaseModel
 # Import LabGen modules
 import sys
 sys.path.append(str(Path(__file__).parent.parent))
-from main import run_generation as run_labgen_generation
+
 from pipeline.verify import run_all_checks, extract_features, load_classifier, predict_classifier
 
 # Intervention state management
