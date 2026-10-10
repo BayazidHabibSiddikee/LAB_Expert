@@ -27,6 +27,42 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from pipeline.verify import run_all_checks, extract_features, load_classifier, predict_classifier
 
+class ThreadLogCapture:
+    def __init__(self):
+        import sys
+        self.old_stdout = sys.stdout
+        self.old_stderr = sys.stderr
+        self.callbacks = {}
+        
+    def write(self, data):
+        import threading
+        tid = threading.get_ident()
+        if tid in self.callbacks:
+            if data.strip():
+                self.callbacks[tid](data)
+        else:
+            self.old_stdout.write(data)
+            
+    def flush(self):
+        self.old_stdout.flush()
+        self.old_stderr.flush()
+
+import sys
+log_capture = ThreadLogCapture()
+sys.stdout = log_capture
+sys.stderr = log_capture
+
+# Fix logging to use dynamic sys.stdout
+import logging
+for handler in logging.getLogger().handlers:
+    handler.stream = sys.stdout
+
+class DummyArgs:
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+
+
 # Intervention state management
 intervention_events: Dict[str, asyncio.Event] = {}
 intervention_actions: Dict[str, str] = {}
@@ -322,13 +358,15 @@ async def emit_stage_event(websocket: WebSocket, report_id: str, event_type: str
         message.update(data)
     await websocket.send_text(json.dumps(message))
 
+
 async def run_generation_with_progress(websocket: WebSocket, report_id: str, params: dict):
     """Run the actual LabGen generation with stage-based progress updates"""
     import asyncio
-    import subprocess
     import os
     import json
-    import re
+    import threading
+    import sys
+    from main import run_generation
     
     try:
         exp_name = params.get("experimentName", "Test Experiment")
@@ -339,50 +377,74 @@ async def run_generation_with_progress(websocket: WebSocket, report_id: str, par
         cad_requested = bool(cad_prompt)
         fluidsim_requested = bool(fluidsim_prompt)
         
+        args = DummyArgs(
+            name=exp_name,
+            exp=exp_num,
+            circuit_prompt=circuit_prompt,
+            cad_prompt=cad_prompt,
+            fluidsim_prompt=fluidsim_prompt
+        )
+        
         # Stage 1: Heuristic Gating
         await emit_stage_event(websocket, report_id, "stage_start", "heuristic", {
             "message": "Initializing heuristic gating...",
             "progress": 0
         })
         
-        cmd = ["python", "main.py", "generate", exp_name, "--exp", exp_num]
-        if circuit_prompt:
-            cmd.append(circuit_prompt)
-        if cad_prompt:
-            cmd.extend(["--cad-prompt", cad_prompt])
-        if fluidsim_prompt:
-            cmd.extend(["--fluidsim-prompt", fluidsim_prompt])
-            
         labgen_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            cwd=labgen_dir,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT
-        )
         
         current_stage = "heuristic"
         stage_progress = {"heuristic": 0, "physics": 0, "cad": 0, "report": 0}
         assets = []
         stage_started = {"heuristic": False, "physics": False, "cad": False, "report": False}
         
-        # Start first stage
-        await emit_stage_event(websocket, report_id, "stage_start", "heuristic", {"message": "Initializing heuristic gating...", "progress": 0})
         stage_started["heuristic"] = True
         
+        # Thread-safe queue for logs
+        import queue
+        log_queue = queue.Queue()
+        
+        def log_callback(data):
+            log_queue.put(data)
+            
+        def worker():
+            tid = threading.get_ident()
+            log_capture.callbacks[tid] = log_callback
+            try:
+                run_generation(args, settings)
+            finally:
+                if tid in log_capture.callbacks:
+                    del log_capture.callbacks[tid]
+                log_queue.put(None) # Sentinel
+
+        # Start worker thread
+        worker_task = asyncio.to_thread(worker)
+        
         while True:
-            line = await process.stdout.readline()
-            if not line:
-                break
+            try:
+                # get_nowait to not block asyncio loop
+                line_str = log_queue.get_nowait()
+                if line_str is None:
+                    break
+            except queue.Empty:
+                await asyncio.sleep(0.1)
+                if worker_task.done():
+                    # Process remaining logs
+                    while not log_queue.empty():
+                        line_str = log_queue.get()
+                        if line_str is None:
+                            break
+                        # (We could parse logs here too, but for simplicity we'll just ignore or run one last parse block)
+                    break
+                continue
                 
-            line_str = line.decode('utf-8').strip()
+            line_str = line_str.strip()
             if not line_str:
                 continue
             
             line_lower = line_str.lower()
             
-            # Detect stage transitions from log output (matching main.py actual logs)
+            # Detect stage transitions from log output
             if "initializing rag" in line_lower or "building rag" in line_lower:
                 if current_stage != "heuristic":
                     await emit_stage_event(websocket, report_id, "stage_complete", current_stage, {"progress": 100})
@@ -419,7 +481,6 @@ async def run_generation_with_progress(websocket: WebSocket, report_id: str, par
                     "log": line_str
                 })
                 
-            # CAD stage - only if cad_prompt was provided
             elif cad_requested and ("freecad" in line_lower or "design_cad" in line_lower or "cad_agent" in line_lower or "step file" in line_lower or "creating cad" in line_lower or "cadquery" in line_lower):
                 if current_stage != "cad":
                     await emit_stage_event(websocket, report_id, "stage_complete", current_stage, {"progress": 100})
@@ -466,7 +527,6 @@ async def run_generation_with_progress(websocket: WebSocket, report_id: str, par
                 }))
             
             else:
-                # Generic progress for current stage
                 if current_stage in stage_progress:
                     stage_progress[current_stage] = min(100, stage_progress[current_stage] + 2)
                     await emit_stage_event(websocket, report_id, "stage_progress", current_stage, {
@@ -474,22 +534,14 @@ async def run_generation_with_progress(websocket: WebSocket, report_id: str, par
                         "log": line_str
                     })
             
-            # Also send raw log for terminal
             await websocket.send_text(json.dumps({
                 "type": "log",
                 "reportId": report_id,
                 "stage": current_stage,
                 "content": line_str
             }))
-        
-        await process.wait()
-        
-        if process.returncode != 0:
-            await emit_stage_event(websocket, report_id, "stage_error", current_stage, {
-                "error": f"Generation failed with exit code {process.returncode}",
-                "recoverable": True
-            })
-            return
+            
+        await worker_task
             
         # Complete all stages that were started
         stage_order = ["heuristic", "physics", "cad", "report"]
