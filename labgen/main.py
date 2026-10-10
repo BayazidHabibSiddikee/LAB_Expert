@@ -138,6 +138,9 @@ def run_generation(args, settings):
 
     graph_result = run_pipeline(args.name, circuit_prompt)
     circuit_json = graph_result.get("circuit_json", {})
+    if not circuit_json or not circuit_json.get("netlist_components"):
+        from pipeline.circuit_templates import get_fallback_circuit
+        circuit_json = get_fallback_circuit(args.name, circuit_prompt)
     llm_sections = graph_result.get("report_sections", {})
 
     logger.info("Executing dynamic circuit...")
