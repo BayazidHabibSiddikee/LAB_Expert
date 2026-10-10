@@ -14,10 +14,10 @@ export function AccordionSection({ title, description, children, defaultOpen = t
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <div className={cn('bg-slate-800/50 border border-slate-700 rounded-lg overflow-hidden', className)}>
+    <div className={cn('bg-zinc-800/50 border border-zinc-700 rounded-lg overflow-hidden', className)}>
       <button type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-800 transition-colors"
+        className="w-full px-4 py-3 flex items-center justify-between hover:bg-zinc-800 transition-colors"
         aria-expanded={isOpen}
       >
         <div className="flex items-center gap-3">
@@ -25,18 +25,18 @@ export function AccordionSection({ title, description, children, defaultOpen = t
             'w-5 h-5 flex items-center justify-center transition-transform duration-200',
             isOpen ? 'rotate-90' : 'rotate-0'
           )}>
-            <ChevronRight className="w-4 h-4 text-slate-400" />
+            <ChevronRight className="w-4 h-4 text-zinc-400" />
           </span>
           <div>
             <h3 className="font-medium text-white">{title}</h3>
-            {description && <p className="text-xs text-slate-500">{description}</p>}
+            {description && <p className="text-xs text-zinc-500">{description}</p>}
           </div>
         </div>
-        <ChevronDown className={cn('w-4 h-4 text-slate-400 transition-transform duration-200', isOpen && 'rotate-180')} />
+        <ChevronDown className={cn('w-4 h-4 text-zinc-400 transition-transform duration-200', isOpen && 'rotate-180')} />
       </button>
       
       {isOpen && (
-        <div className="px-4 pb-4 border-t border-slate-700/50 animate-in slide-in-from-top-2 duration-200">
+        <div className="px-4 pb-4 border-t border-zinc-700/50 animate-in slide-in-from-top-2 duration-200">
           {children}
         </div>
       )}

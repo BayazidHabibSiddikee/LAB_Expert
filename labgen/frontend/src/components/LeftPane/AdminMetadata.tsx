@@ -19,14 +19,14 @@ export function AdminMetadata({ formData, onChange, errors }: AdminMetadataProps
     <div className="space-y-3">
       {fields.map((field) => (
         <div key={field.key} className="space-y-1">
-          <label className="block text-xs font-medium text-slate-300">{field.label}</label>
+          <label className="block text-xs font-medium text-zinc-300">{field.label}</label>
           {field.type === 'select' ? (
             <select
               value={formData[field.key]}
               onChange={(e) => onChange(field.key, e.target.value)}
               className={cn(
-                'w-full px-3 py-2 bg-slate-900 border rounded-lg text-white placeholder-slate-500',
-                'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent',
+                'w-full px-3 py-2 bg-zinc-900 border rounded-lg text-white placeholder-zinc-500',
+                'focus:outline-none focus:ring-2 focus:ring-zinc-500/30 focus:border-transparent',
                 'transition-colors',
                 errors?.[field.key] && 'border-red-500/50 focus:ring-red-500/50'
               )}
@@ -43,8 +43,8 @@ export function AdminMetadata({ formData, onChange, errors }: AdminMetadataProps
               onChange={(e) => onChange(field.key, field.type === 'number' ? parseInt(e.target.value) || 0 : e.target.value)}
               placeholder={field.placeholder}
               className={cn(
-                'w-full px-3 py-2 bg-slate-900 border rounded-lg text-white placeholder-slate-500',
-                'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent',
+                'w-full px-3 py-2 bg-zinc-900 border rounded-lg text-white placeholder-zinc-500',
+                'focus:outline-none focus:ring-2 focus:ring-zinc-500/30 focus:border-transparent',
                 'transition-colors',
                 errors?.[field.key] && 'border-red-500/50 focus:ring-red-500/50'
               )}

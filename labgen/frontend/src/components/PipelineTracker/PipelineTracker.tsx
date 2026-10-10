@@ -18,7 +18,7 @@ const STAGE_ICONS: Record<PipelineStageId, React.ComponentType<{ className?: str
 };
 
 const STAGE_COLORS: Record<string, string> = {
-  heuristic: 'text-blue-400',
+  heuristic: 'text-zinc-400',
   physics: 'text-yellow-400',
   cad: 'text-purple-400',
   report: 'text-green-400',
@@ -32,7 +32,7 @@ interface PipelineTrackerProps {
 
 export function PipelineTracker({ stages, currentStage, className }: PipelineTrackerProps) {
   return (
-    <div className={cn('bg-slate-900/80 border-b border-slate-700 backdrop-blur-sm', className)}>
+    <div className={cn('bg-zinc-900/80 border-b border-zinc-700 backdrop-blur-sm', className)}>
       <div className="max-w-full mx-auto px-4">
         <div className="flex items-center gap-2 overflow-x-auto pb-3 pt-2">
           {stages.map((stage, index) => {
@@ -50,7 +50,7 @@ export function PipelineTracker({ stages, currentStage, className }: PipelineTra
                     <div 
                       className={cn(
                         'absolute top-0 left-0 h-full rounded transition-all duration-300',
-                        isActive || isComplete ? 'bg-green-500/50' : 'bg-slate-700'
+                        isActive || isComplete ? 'bg-green-500/50' : 'bg-zinc-700'
                       )}
                       style={{ width: `${isComplete ? 100 : isActive ? (stage.progress / 100) * 100 : 0}%` }}
                     />
@@ -63,8 +63,8 @@ export function PipelineTracker({ stages, currentStage, className }: PipelineTra
                     'relative flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300',
                     isError && 'bg-red-500/20 text-red-400 border border-red-500/50',
                     isComplete && 'bg-green-500/20 text-green-400 border border-green-500/50',
-                    isActive && !isError && 'bg-blue-500/20 text-blue-400 border border-blue-500/50 animate-pulse',
-                    !isActive && !isComplete && !isError && 'bg-slate-700 text-slate-500 border border-slate-600'
+                    isActive && !isError && 'bg-zinc-800/50 text-zinc-400 border border-zinc-500/30 animate-pulse',
+                    !isActive && !isComplete && !isError && 'bg-zinc-700 text-zinc-500 border border-zinc-600'
                   )}>
                     {isError ? (
                       <AlertCircle className="w-5 h-5" />
@@ -85,12 +85,12 @@ export function PipelineTracker({ stages, currentStage, className }: PipelineTra
                         isActive && 'text-white',
                         isComplete && 'text-green-400',
                         isError && 'text-red-400',
-                        !isActive && !isComplete && 'text-slate-400'
+                        !isActive && !isComplete && 'text-zinc-400'
                       )}>
                         {stage.name}
                       </span>
                       {isActive && (
-                        <span className="px-1.5 py-0.5 text-xs bg-blue-500/20 text-blue-400 rounded font-mono">
+                        <span className="px-1.5 py-0.5 text-xs bg-zinc-800/50 text-zinc-400 rounded font-mono">
                           {stage.progress}%
                         </span>
                       )}
@@ -100,18 +100,18 @@ export function PipelineTracker({ stages, currentStage, className }: PipelineTra
                         </span>
                       )}
                     </div>
-                    <p className={cn('text-xs truncate', isActive ? 'text-slate-300' : 'text-slate-500')}>
+                    <p className={cn('text-xs truncate', isActive ? 'text-zinc-300' : 'text-zinc-500')}>
                       {stage.description}
                     </p>
                   </div>
                 </div>
 
                 {/* Mobile progress bar */}
-                <div className="md:hidden w-20 h-1.5 bg-slate-700 rounded-full overflow-hidden flex-shrink-0">
+                <div className="md:hidden w-20 h-1.5 bg-zinc-700 rounded-full overflow-hidden flex-shrink-0">
                   <div 
                     className={cn(
                         'h-full rounded-full transition-all duration-300',
-                        isError ? 'bg-red-500' : isComplete ? 'bg-green-500' : isActive ? 'bg-blue-500' : 'bg-transparent'
+                        isError ? 'bg-red-500' : isComplete ? 'bg-green-500' : isActive ? 'bg-zinc-100' : 'bg-transparent'
                       )}
                     style={{ width: `${stage.progress}%` }}
                   />
@@ -122,9 +122,9 @@ export function PipelineTracker({ stages, currentStage, className }: PipelineTra
         </div>
         
         {/* Overall progress bar */}
-        <div className="h-1 bg-slate-800 rounded-full overflow-hidden mb-2">
+        <div className="h-1 bg-zinc-800 rounded-full overflow-hidden mb-2">
           <div 
-            className="h-full bg-gradient-to-r from-blue-500 via-yellow-500 to-green-500 transition-all duration-500"
+            className="h-full bg-gradient-to-r from-zinc-100 via-yellow-500 to-green-500 transition-all duration-500"
             style={{ width: `${stages.reduce((acc, s) => acc + s.progress, 0) / stages.length}%` }}
           />
         </div>

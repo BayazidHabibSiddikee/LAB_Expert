@@ -33,10 +33,10 @@ function KeyValueEditor({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <label className="block text-xs font-medium text-slate-300">{label}</label>
+        <label className="block text-xs font-medium text-zinc-300">{label}</label>
         <button type="button"
           onClick={addPair}
-          className="px-2 py-1 text-xs font-medium text-blue-400 hover:text-blue-300 flex items-center gap-1"
+          className="px-2 py-1 text-xs font-medium text-zinc-400 hover:text-blue-300 flex items-center gap-1"
         >
           <Plus className="w-3 h-3" />
           Add
@@ -44,29 +44,29 @@ function KeyValueEditor({
       </div>
       
       {pairs.length === 0 ? (
-        <p className="text-xs text-slate-500 italic">No parameters defined. Click Add to define custom parameters.</p>
+        <p className="text-xs text-zinc-500 italic">No parameters defined. Click Add to define custom parameters.</p>
       ) : (
         <div className="space-y-2">
           {pairs.map((pair, index) => (
             <div key={index} className="flex items-center gap-2">
-              <Key className="w-4 h-4 text-slate-500 flex-shrink-0" />
+              <Key className="w-4 h-4 text-zinc-500 flex-shrink-0" />
               <input
                 type="text"
                 value={pair.key}
                 onChange={(e) => onChange(index, e.target.value, pair.value)}
                 placeholder={placeholderKey}
-                className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-colors"
+                className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/30 focus:border-transparent transition-colors"
               />
               <input
                 type="text"
                 value={pair.value}
                 onChange={(e) => onChange(index, pair.key, e.target.value)}
                 placeholder={placeholderValue}
-                className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-colors"
+                className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/30 focus:border-transparent transition-colors"
               />
               <button type="button"
                 onClick={() => removePair(index)}
-                className="p-1.5 text-slate-500 hover:text-red-400 transition-colors"
+                className="p-1.5 text-zinc-500 hover:text-red-400 transition-colors"
                 aria-label="Remove parameter"
               >
                 <Trash2 className="w-4 h-4" />

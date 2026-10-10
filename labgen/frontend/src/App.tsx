@@ -305,7 +305,7 @@ export function App() {
   }, []);
 
   return (
-    <div className="h-screen w-full bg-slate-950 flex flex-col overflow-hidden font-sans antialiased">
+    <div className="h-screen w-full bg-zinc-950 flex flex-col overflow-hidden font-sans antialiased">
       {/* Pipeline Tracker - Fixed Top */}
       <PipelineTracker 
         stages={stages} 
@@ -338,7 +338,7 @@ export function App() {
         />
 
         {/* Resize handle between center and left (optional) */}
-        <div className="hidden lg:block w-px bg-slate-700 hover:bg-blue-500/50 transition-colors cursor-col-resize" />
+        <div className="hidden lg:block w-px bg-zinc-700 hover:bg-zinc-100/50 transition-colors cursor-col-resize" />
       </div>
 
       {/* Bottom Terminal */}
@@ -359,12 +359,12 @@ export function App() {
 
 function BootScreen() {
   return (
-    <div className="h-screen w-full flex items-center justify-center bg-slate-950">
+    <div className="h-screen w-full flex items-center justify-center bg-zinc-950">
       <div className="text-center">
         <div className="text-4xl font-bold text-white tracking-tight mb-2">LABGEN</div>
-        <div className="text-slate-500 text-sm">IDE Workspace v3.0.0</div>
-        <div className="mt-8 flex items-center justify-center gap-3 text-slate-600">
-          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <div className="text-zinc-500 text-sm">IDE Workspace v3.0.0</div>
+        <div className="mt-8 flex items-center justify-center gap-3 text-zinc-600">
+          <div className="w-8 h-8 border-2 border-zinc-100 border-t-transparent rounded-full animate-spin" />
         </div>
       </div>
     </div>
