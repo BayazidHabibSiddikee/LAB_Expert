@@ -13,7 +13,7 @@ import schemdraw
 import schemdraw.elements as elm
 from pipeline.assemble import load_config, render_latex, compile_pdf
 from pipeline.llm import generate_report_sections, generate_circuit_design
-from pipeline.research import get_hybrid_research_context, save_research_context
+from pipeline.research import save_research_context
 from pipeline.rag import build_rag_index
 from pipeline.cad import design_cad_agent
 from pipeline.verify import run_all_checks, write_report, extract_features
@@ -458,7 +458,7 @@ def run_generation(args, settings):
     logger.info("Assembling LaTeX report...")
     config = load_config()
 
-    research_context = get_hybrid_research_context(args.name, use_rag=True, use_web=True)
+    research_context = graph_result.get("research_context", "")
     save_research_context(run_dir, args.name, research_context)
 
     data_table_latex = _build_data_table_from_simulation(txt_out)
