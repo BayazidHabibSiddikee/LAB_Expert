@@ -425,15 +425,15 @@ def run_generation(args, settings):
         "date_performance": datetime.date.today().strftime("%B %d, %Y"),
         "date_submission": (datetime.date.today() + datetime.timedelta(days=7)).strftime("%B %d, %Y"),
         "sections": sections,
-        "circuit_img": os.path.abspath(schem_path).replace('\\\\', '/') if schem_path else "",
-        "theory_img": os.path.abspath(theory_img_path).replace('\\\\', '/') if theory_img_path else "",
+        "circuit_img": os.path.abspath(schem_path).replace('\\', '/') if schem_path else "",
+        "theory_img": os.path.abspath(theory_img_path).replace('\\', '/') if theory_img_path else "",
         "plots": [
-            {"path": os.path.abspath(plot_path).replace('\\\\', '/') if plot_path else "", "caption": f"Simulated {args.name} DC Characteristics"}
+            {"path": os.path.abspath(plot_path).replace('\\', '/') if plot_path else "", "caption": f"Simulated {args.name} DC Characteristics"}
         ]
     }
     
     if tran_plot_path and os.path.exists(tran_plot_path):
-        context["plots"].append({"path": os.path.abspath(tran_plot_path).replace('\\\\', '/'), "caption": f"Simulated {args.name} Transient Response"})
+        context["plots"].append({"path": os.path.abspath(tran_plot_path).replace('\\', '/'), "caption": f"Simulated {args.name} Transient Response"})
 
     if args.cad_prompt:
         from pipeline.cad import design_cad_agent
