@@ -1,6 +1,6 @@
 {
   "llm": {
-    "provider": "openai",
+    "provider": "custom",
     "base_url": "https://router.bynara.id/v1",
     "api_key": "YOUR_API_KEY_HERE",
     "model": "nemotron-3.5-lightning-free",
