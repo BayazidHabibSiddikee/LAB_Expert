@@ -245,6 +245,16 @@ def run_generation(args, settings):
                 
         is_transient = any(kw in args.name.lower() for kw in ["buck", "boost", "converter", "rectifier", "inverter", "oscillator", "filter", "chopper", "switching"])
         
+        # Try to infer the output node from the netlist
+        out_node = "2"
+        for comp in comps:
+            parts = comp.split()
+            if (comp.startswith("RLOAD") or comp.startswith("R_L")) and len(parts) >= 3:
+                out_node = parts[1]
+                break
+            elif comp.startswith("R") and len(parts) >= 3 and parts[2] == "0":
+                out_node = parts[1]
+                
         loop_netlist += f"""
 * Analysis
 """
@@ -255,7 +265,7 @@ def run_generation(args, settings):
 .control
     run
     setplot tran1
-    wrdata {loop_txt_out.replace('.txt', '_tran.txt')} time V(2) -I(V1)
+    wrdata {loop_txt_out.replace('.txt', '_tran.txt')} time V({out_node}) -I(V1)
 .endc
 .end
 """
@@ -265,7 +275,7 @@ def run_generation(args, settings):
 
 .control
     run
-    let V_target = V(2)
+    let V_target = V({out_node})
     let I_target = -I(V1)
     wrdata {loop_txt_out} V_target I_target
 .endc
@@ -306,350 +316,39 @@ def run_generation(args, settings):
         
         is_transient = any(kw in args.name.lower() for kw in ["buck", "boost", "converter", "rectifier", "inverter", "oscillator", "filter", "chopper", "switching"])
         
-        fb_netlist += "\n* Analysis\n"
+        # Try to infer the output node from the netlist
+        out_node = "2"
+        for comp in comps:
+            parts = comp.split()
+            if (comp.startswith("RLOAD") or comp.startswith("R_L")) and len(parts) >= 3:
+                out_node = parts[1]
+                break
+            elif comp.startswith("R") and len(parts) >= 3 and parts[2] == "0":
+                out_node = parts[1]
+                
+        loop_netlist += f"""
+* Analysis
+"""
         if is_transient:
-            fb_netlist += f"""
+            loop_netlist += f"""
 .tran 10u 10m
+
 .control
     run
     setplot tran1
-    wrdata {txt_out.replace('.txt', '_tran.txt')} time V(2) -I(V1)
+    wrdata {loop_txt_out.replace('.txt', '_tran.txt')} time V({out_node}) -I(V1)
 .endc
 .end
 """
         else:
-            fb_netlist += f"""
+            loop_netlist += f"""
 .dc V1 -15 15 0.1
+
 .control
     run
-    let V_target = V(2)
+    let V_target = V({out_node})
     let I_target = -I(V1)
-    wrdata {txt_out} V_target I_target
+    wrdata {loop_txt_out} V_target I_target
 .endc
 .end
 """
-        with open(cir_path, 'w') as f:
-            f.write(fb_netlist)
-            
-        subprocess.run(["ngspice", "-b", cir_path], capture_output=True)
-        if is_transient:
-            try:
-                df_tran = pd.read_csv(txt_out.replace('.txt', '_tran.txt'), sep=r'\s+', header=None)
-                tran_data.append(("Fallback", 'b', df_tran))
-            except Exception:
-                pass
-        else:
-            try:
-                df = pd.read_csv(txt_out, sep=r'\s+', header=None)
-                if df.shape[1] >= 4:
-                    plt.plot(df[1], df[3] * 1000, linewidth=2, color='b', label="Fallback")
-                elif df.shape[1] >= 2:
-                    plt.plot(df[0], df[1] * 1000, linewidth=2, color='b', label="Fallback")
-            except Exception:
-                pass
-    else:
-        import shutil
-        try:
-            if os.path.exists(txt_out.replace('.txt', '_0.txt')):
-                shutil.copy(txt_out.replace('.txt', '_0.txt'), txt_out)
-            if os.path.exists(txt_out.replace('.txt', '_0_tran.txt')):
-                shutil.copy(txt_out.replace('.txt', '_0_tran.txt'), txt_out.replace('.txt', '_tran.txt'))
-        except:
-            pass
-            
-    plot_path = os.path.join(run_dir, "figs", f"{slug}_plot.png")
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(plot_path, dpi=300)
-    
-    tran_plot_path = None
-    if tran_data:
-        plt.figure(figsize=(8, 6))
-        plt.title(f"{args.name} Transient Response (Voltage)", fontsize=14)
-        plt.xlabel("Time (ms)", fontsize=12)
-        plt.ylabel("Voltage (V)", fontsize=12)
-        plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-        for r_val, color, df_tran in tran_data:
-            if df_tran.shape[1] >= 4:
-                plt.plot(df_tran[1] * 1000, df_tran[3], linewidth=2, color=color, label=f"R={r_val}")
-            elif df_tran.shape[1] >= 2:
-                plt.plot(df_tran[0] * 1000, df_tran[1], linewidth=2, color=color, label=f"R={r_val}")
-        plt.legend()
-        plt.tight_layout()
-        tran_plot_path = os.path.join(run_dir, "figs", f"{slug}_tran_plot.png")
-        plt.savefig(tran_plot_path, dpi=300)
-    plt.close()
-        
-    def _execute_schemdraw(code, path, skip_ast=False):
-        import schemdraw
-        import schemdraw.elements as elm
-        safe_builtins = {
-            'print': print, 'range': range, 'int': int, 'float': float,
-            'str': str, 'list': list, 'dict': dict, 'Exception': Exception,
-            'zip': zip, 'enumerate': enumerate, 'len': len
-        }
-        safe_globals = {
-            "__builtins__": safe_builtins,
-            "schemdraw": schemdraw,
-            "elm": elm
-        }
-        local_vars = {}
-        if skip_ast or validate_schemdraw_ast(code):
-            try:
-                exec(code, safe_globals, local_vars)
-                if 'draw_circuit' in local_vars:
-                    local_vars['draw_circuit'](path)
-                    return True
-            except Exception as e:
-                logger.error(f"Execution error: {e}")
-        return False
-
-    schemdraw_code = circuit_json.get("schemdraw_code", "")
-    if not (schemdraw_code and _execute_schemdraw(schemdraw_code, schem_path, skip_ast=False)):
-        logger.warning("Dynamic schemdraw failed, falling back to template...")
-        from pipeline.circuit_templates import get_fallback_circuit
-        fallback_json = get_fallback_circuit(args.name, circuit_prompt)
-        fb_code = fallback_json.get("schemdraw_code", "")
-        if fb_code:
-            _execute_schemdraw(fb_code, schem_path, skip_ast=True)
-
-    logger.info("Scraping theory reference images (if enabled)...")
-    theory_img_path = ""
-    if settings.get("scraper", {}).get("enabled"):
-        try:
-            from pipeline.scraper_integration import get_theory_image
-            theory_img_path = get_theory_image(args.name + " electronic device", run_dir)
-        except Exception as e:
-            logger.error(f"Scraper integration failed: {e}")
-
-    logger.info("Assembling LaTeX report...")
-    config = load_config()
-
-    research_context = graph_result.get("research_context", "")
-    save_research_context(run_dir, args.name, research_context)
-
-    data_table_latex = _build_data_table_from_simulation(txt_out)
-
-    def esc(t):
-        if isinstance(t, str): return t.replace('_', '\\_')
-        if isinstance(t, list): return [esc(x) for x in t]
-        return t
-
-    sections = {
-        "objectives": esc(llm_sections.get("objectives", [])),
-        "theory": esc(llm_sections.get("theory", "")),
-        "discussion": esc(llm_sections.get("discussion", "")),
-        "conclusion": esc(llm_sections.get("conclusion", "")),
-        "procedure": esc(llm_sections.get("procedure", [
-            "Connect the setup as per the diagram.",
-            "Set up the simulation and initialize parameters.",
-            "Record the output and plot the results."
-        ])),
-        "data_table_latex": data_table_latex,
-        "references": ["Generated by LabGen Knowledge Hub API", "Ngspice Simulation Data."]
-    }
-
-    if circuit_json:
-        sections["circuit_design"] = circuit_json.get("circuit_design_text", "")
-
-    sections["apparatus"] = circuit_json.get("apparatus", []) if circuit_json else []
-
-    context = {
-        "config": config,
-        "experiment_no": f"{args.exp:02d}",
-        "experiment_name": args.name,
-        "date_performance": datetime.date.today().strftime("%B %d, %Y"),
-        "date_submission": (datetime.date.today() + datetime.timedelta(days=7)).strftime("%B %d, %Y"),
-        "sections": sections,
-        "circuit_img": os.path.abspath(schem_path).replace('\\', '/') if schem_path else "",
-        "theory_img": os.path.abspath(theory_img_path).replace('\\', '/') if theory_img_path else "",
-        "plots": [
-            {"path": os.path.abspath(plot_path).replace('\\', '/') if plot_path else "", "caption": f"Simulated {args.name} DC Characteristics"}
-        ]
-    }
-    
-    if tran_plot_path and os.path.exists(tran_plot_path):
-        context["plots"].append({"path": os.path.abspath(tran_plot_path).replace('\\', '/'), "caption": f"Simulated {args.name} Transient Response"})
-
-    if args.cad_prompt:
-        from pipeline.cad import design_cad_agent
-        cad_step_path = os.path.join(run_dir, "cad_model.step")
-        success = design_cad_agent(args.cad_prompt, cad_step_path)
-        if success:
-            cad_svg = os.path.abspath(cad_step_path.replace(".step", ".svg")).replace("\\", "/")
-            if os.path.exists(cad_svg):
-                context["cad_img"] = cad_svg
-
-    if hasattr(args, 'fluidsim_prompt') and args.fluidsim_prompt:
-        from pipeline.fluidsim import generate_fluidsim_circuit
-        fs_path = os.path.join(run_dir, "pneumatic_circuit.ct")
-        success = generate_fluidsim_circuit(args.fluidsim_prompt, fs_path)
-        if success:
-            # LaTeX \includegraphics cannot render JSON. Store it in a separate context key.
-            context["fluidsim_data"] = os.path.abspath(fs_path.replace(".ct", ".json")).replace("\\", "/")
-
-    pdf_filename = f"Exp_{args.exp:02d}_{slug}.tex"
-    tex_out = os.path.join(run_dir, pdf_filename)
-    render_latex(os.path.join("templates", "report.tex.j2"), tex_out, context)
-
-    compile_pdf(tex_out, run_dir)
-
-    if settings.get("verification", {}).get("enabled", True):
-        logger.info("Running verification...")
-        report_bundle = {
-            "experiment_name": args.name,
-            "sections": sections,
-            "circuit_json": circuit_json,
-            "iv_data_path": txt_out,
-            "research_context": research_context,
-            "settings": settings,
-            "plots": context["plots"]
-        }
-        results = run_all_checks(report_bundle)
-        write_report(results, os.path.join(run_dir, "verification_report.json"))
-
-    logger.info("Done!")
-
-def run_verification(args, settings):
-    if args.input.endswith(".pdf"):
-        from pipeline.ingest import extract_pdf
-        logger.info(f"Extracting PDF: {args.input}")
-        extracted = extract_pdf(args.input)
-        if "error" in extracted:
-            logger.error(f"Error: {extracted['error']}")
-            return
-
-        sections = extracted.get("sections", {})
-        latex_table = extracted.get("latex_table", "")
-        if latex_table:
-            sections["data_table_latex"] = latex_table
-
-        report_bundle = {
-            "experiment_name": args.experiment or "Unknown",
-            "sections": sections,
-            "circuit_json": {},
-            "iv_data_path": args.data if args.data and os.path.exists(args.data) else "",
-            "research_context": "",
-            "settings": settings,
-            "plots": []
-        }
-    else:
-        run_dir = args.input
-        tex_file = None
-        for f in os.listdir(run_dir):
-            if f.endswith(".tex"):
-                tex_file = os.path.join(run_dir, f)
-                break
-        if not tex_file:
-            logger.warning("No .tex file found in run directory")
-            return
-
-        with open(tex_file, "r") as f:
-            tex_content = f.read()
-
-        import re
-        sections = {}
-        section_matches = re.findall(r"\\section\{([^}]+)\}(.*?)(?=\\section|\\end\{document\})", tex_content, re.DOTALL)
-        for name, content in section_matches:
-            sections[name.lower().replace(" ", "_")] = content.strip()
-
-        table_match = re.search(r"\\begin\{table\}.*?\\end\{table\}", tex_content, re.DOTALL)
-        if table_match:
-            sections["data_table_latex"] = table_match.group(0)
-
-        iv_path = os.path.join(run_dir, "iv_data.txt")
-        if not os.path.exists(iv_path) and args.data:
-            iv_path = args.data
-
-        research_path = os.path.join(run_dir, "research_context.json")
-        research_context = ""
-        if os.path.exists(research_path):
-            with open(research_path, "r") as f:
-                research_context = json.load(f).get("context", "")
-
-        circuit_json = {}
-        circuit_path = os.path.join(run_dir, "dynamic.cir")
-        if os.path.exists(circuit_path):
-            pass
-
-        report_bundle = {
-            "experiment_name": args.experiment or "Unknown",
-            "sections": sections,
-            "circuit_json": circuit_json,
-            "iv_data_path": iv_path,
-            "research_context": research_context,
-            "settings": settings,
-            "plots": []
-        }
-
-    logger.info("Running verification...")
-    results = run_all_checks(report_bundle)
-
-    print(json.dumps(results, indent=2))
-
-    if args.output:
-        write_report(results, args.output)
-    else:
-        out_path = os.path.join(os.path.dirname(args.input), "verification_report.json") if not args.input.endswith(".pdf") else args.input.replace(".pdf", "_verification.json")
-        write_report(results, out_path)
-
-def run_index(args, settings):
-    from pipeline.rag import build_rag_index, get_rag_context
-    from pipeline.cad import design_cad_agent
-    if args.rebuild:
-        logger.info("Rebuilding RAG index...")
-        build_rag_index(force_rebuild=True)
-    else:
-        logger.info("Loading/building RAG index...")
-        build_rag_index()
-    
-    if args.query:
-        logger.info(f"\nQuery: {args.query}")
-        print(get_rag_context(args.query, top_k=args.top_k))
-
-def main():
-    parser = argparse.ArgumentParser(description="LabGen - EEE Lab Report Generator & Verifier")
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    gen_parser = subparsers.add_parser("generate", help="Generate lab report")
-    gen_parser.add_argument("name", help="Name of the experiment")
-    gen_parser.add_argument("circuit_prompt", nargs="?", default="", help="Prompt describing circuit connections")
-    gen_parser.add_argument("--cad-prompt", help="Prompt for generating 3D CAD mechanical models via CadQuery")
-    gen_parser.add_argument("--fluidsim-prompt", help="Prompt for generating FluidSim pneumatic/hydraulic circuits")
-    gen_parser.add_argument("--exp", type=int, default=2, help="Experiment number")
-
-    verify_parser = subparsers.add_parser("verify", help="Verify lab report")
-    verify_parser.add_argument("input", help="Path to PDF, .tex file, or run directory")
-    verify_parser.add_argument("--experiment", help="Experiment name (for PDF verification)")
-    verify_parser.add_argument("--data", help="Path to iv_data.txt for data cross-check")
-    verify_parser.add_argument("--output", help="Output path for verification report")
-
-    index_parser = subparsers.add_parser("index", help="Manage RAG index")
-    index_parser.add_argument("--rebuild", action="store_true", help="Force rebuild index")
-    index_parser.add_argument("--query", help="Test query against index")
-    index_parser.add_argument("--top-k", type=int, default=5, help="Number of results")
-
-    args = parser.parse_args()
-
-    from pipeline.config import load_settings, get_api_key
-    settings = load_settings()
-
-    # Commands that don't need API key
-    if args.command in ("index", "verify"):
-        if args.command == "index":
-            run_index(args, settings)
-        else:
-            run_verification(args, settings)
-        return
-
-    api_key = get_api_key()
-    if not api_key or api_key == "YOUR_API_KEY":
-        logger.error("Error: Please configure your API key in settings.json or export GEMINI_API_KEY.")
-        return
-    os.environ["GEMINI_API_KEY"] = api_key
-
-    if args.command == "generate":
-        run_generation(args, settings)
-
-if __name__ == "__main__":
-    main()
